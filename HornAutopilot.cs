@@ -22,6 +22,7 @@ public sealed unsafe class HornAutopilot
     private DateTime nextYes = DateTime.MinValue;
     private string lastWarn = string.Empty;
     private DateTime lastWarnAt = DateTime.MinValue;
+    private string lastRosterSignature = string.Empty;
 
     public HornAutopilot(Plugin plugin, IPluginLog log, IGameGui gameGui, IClientState clientState)
     {
@@ -70,6 +71,7 @@ public sealed unsafe class HornAutopilot
         {
             this.Fire(yesno, 0);
             this.nextYes = DateTime.UtcNow.AddSeconds(1);
+            this.plugin.CpLog.Info("answered the unfilled-horns prompt with Yes");
             this.log.Information("[CP] Answered the underfilled-horns prompt");
             return;
         }
@@ -78,6 +80,13 @@ public sealed unsafe class HornAutopilot
         if (rows.Count == 0)
         {
             return;
+        }
+
+        string rosterSignature = string.Join(",", rows.Select(r => $"{r.Number}:{r.Selection}:{r.Hp}"));
+        if (rosterSignature != this.lastRosterSignature)
+        {
+            this.lastRosterSignature = rosterSignature;
+            this.plugin.CpLog.Info("roster " + string.Join(" ", rows.Select(r => $"#{r.Number}(hp {r.Hp}/{r.MaxHp} sel {r.Selection})")));
         }
 
         var roster = rows.Select(r => r.Number).ToHashSet();
@@ -111,6 +120,7 @@ public sealed unsafe class HornAutopilot
                 this.Fire(stage, 8);
                 this.lastConfirm = DateTime.UtcNow;
                 this.log.Information($"[CP] Trio ({string.Join(",", target)}) on the horns - starting the fight");
+                this.plugin.CpLog.Info($"starting fight with {string.Join(",", target)}");
             }
 
             return;
@@ -139,6 +149,7 @@ public sealed unsafe class HornAutopilot
         this.Fire(party, 1, row.Index);
         this.nextAction = DateTime.UtcNow.AddMilliseconds(350);
         this.log.Debug($"[CP] Toggle familiar #{row.Number} (row {row.Index}, selection {row.Selection})");
+        this.plugin.CpLog.Info($"toggle #{row.Number} row {row.Index} (was sel {row.Selection})");
     }
 
     private void Fire(AtkUnitBase* addon, params int[] values)
@@ -191,6 +202,7 @@ public sealed unsafe class HornAutopilot
 
         var picks = this.plugin.Intel.PickTrio(roster.ToList(), out string reason);
         this.LastPickReason = reason;
+        this.plugin.CpLog.Info("enemies: " + string.Join(", ", enemies) + " -> pick " + string.Join(",", picks) + " (" + reason + ")");
         if (picks.Count != 3 || picks.Any(p => !roster.Contains(p)))
         {
             this.log.Debug($"[CP] encounter picker fell back to the configured trio ({reason})");

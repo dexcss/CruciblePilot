@@ -25,6 +25,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly EnemyIntel intel;
     private readonly HornAutopilot horns;
     private readonly Ui ui;
+    private readonly CpLog cpLog;
     private bool pushedOverrides;
 
     public Plugin(
@@ -46,6 +47,7 @@ public sealed class Plugin : IDalamudPlugin
         this.framework = framework;
 
         this.Config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        this.cpLog = new CpLog(pluginInterface.GetPluginConfigDirectory());
         this.autoDuty = new AutoDutyIpc(pluginInterface, log);
         this.autoDutyTeam = new AutoDutyTeam(log);
         this.intel = new EnemyIntel(objects, data, log);
@@ -61,6 +63,7 @@ public sealed class Plugin : IDalamudPlugin
         this.framework.Update += this.OnFrameworkUpdate;
         this.pluginInterface.UiBuilder.Draw += this.ui.Draw;
         this.log.Information("[CP] CruciblePilot loaded");
+        this.cpLog.Info($"loaded v{typeof(Plugin).Assembly.GetName().Version} - log file {this.cpLog.CurrentFile}");
     }
 
     public static Plugin Instance { get; private set; } = null!;
@@ -69,9 +72,15 @@ public sealed class Plugin : IDalamudPlugin
 
     public EnemyIntel Intel => this.intel;
 
+    public CpLog CpLog => this.cpLog;
+
     public string Name => "CruciblePilot";
 
-    public void Chat(string message) => this.chat.Print(message);
+    public void Chat(string message)
+    {
+        this.chat.Print(message);
+        this.cpLog.Info("chat: " + message);
+    }
 
     public void Dispose()
     {
@@ -83,6 +92,8 @@ public sealed class Plugin : IDalamudPlugin
             this.autoDuty.Pop();
         }
 
+        this.cpLog.Info("unloaded");
+        this.cpLog.Dispose();
         this.log.Information("[CP] CruciblePilot unloaded");
     }
 
@@ -121,6 +132,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         var parts = arguments.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var verb = parts.Length > 0 ? parts[0].ToLowerInvariant() : "ui";
+        this.cpLog.Info("/cp " + arguments);
         try
         {
             switch (verb)
@@ -152,6 +164,9 @@ public sealed class Plugin : IDalamudPlugin
                     break;
                 case "dump":
                     this.Chat("[CruciblePilot] " + this.GetHornLine());
+                    break;
+                case "log":
+                    this.Chat("[CruciblePilot] log: " + this.cpLog.CurrentFile);
                     break;
                 case "scan":
                     this.Chat("[CruciblePilot] " + this.GetEnemyLine());
@@ -322,11 +337,13 @@ public sealed class Plugin : IDalamudPlugin
 
         if (!this.autoDuty.Push(overrides))
         {
+            this.cpLog.Error("AutoDuty rejected the run settings");
             this.Chat("[CruciblePilot] AutoDuty rejected the run settings");
             return;
         }
 
         this.pushedOverrides = true;
+        this.cpLog.Info("pushed AutoDuty overrides: " + string.Join(", ", overrides.Select(kv => kv.Key + "=" + kv.Value)));
 
         try
         {
@@ -335,6 +352,7 @@ public sealed class Plugin : IDalamudPlugin
         }
         catch (Exception ex)
         {
+            this.cpLog.Error(ex, "AutoDuty.Run failed");
             this.log.Error(ex, "[CP] AutoDuty.Run failed");
             this.autoDuty.Pop();
             this.pushedOverrides = false;
