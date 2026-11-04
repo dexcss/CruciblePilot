@@ -43,6 +43,34 @@ public sealed class FoodHelper
         }
     }
 
+    /// <summary>Remaining Well Fed time in minutes (0 when no meal buff is up).</summary>
+    public double RemainingFoodMinutes()
+    {
+        var player = this.objects.LocalPlayer;
+        if (player == null)
+        {
+            return 0;
+        }
+
+        unsafe
+        {
+            var character = (FFXIVClientStructs.FFXIV.Client.Game.Character.Character*)player.Address;
+            if (character == null)
+            {
+                return 0;
+            }
+
+            var statusManager = character->GetStatusManager();
+            if (statusManager == null)
+            {
+                return 0;
+            }
+
+            int index = statusManager->GetStatusIndex(WellFedStatus);
+            return index < 0 ? 0 : statusManager->GetRemainingTime(index) / 60.0;
+        }
+    }
+
     /// <summary>Eats the configured food when the buff is missing and food eating is enabled.</summary>
     public void TryEat(Configuration config)
     {
@@ -51,9 +79,9 @@ public sealed class FoodHelper
             return;
         }
 
-        if (this.HasFood())
+        if (this.RemainingFoodMinutes() >= config.FoodRefreshMinutes)
         {
-            this.plugin.CpLog.Info("food: Well Fed already active");
+            this.plugin.CpLog.Info($"food: Well Fed already active ({this.RemainingFoodMinutes():0} min left)");
             return;
         }
 

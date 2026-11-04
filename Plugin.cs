@@ -443,15 +443,18 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         // Wait for the meal buff before entering: eating has to happen out of the duty and takes a moment to apply.
-        this.cpLog.Info("food: Well Fed " + (this.food.HasFood() ? "active" : "missing"));
+        double foodMinutes = this.food.RemainingFoodMinutes();
+        this.cpLog.Info(foodMinutes > 0
+            ? $"food: Well Fed active ({foodMinutes:0} min left, re-eat threshold {this.Config.FoodRefreshMinutes})"
+            : "food: Well Fed missing");
 
-        if (this.Config.EatFood && !this.food.HasFood())
+        if (this.Config.EatFood && foodMinutes < this.Config.FoodRefreshMinutes)
         {
             this.food.TryEat(this.Config);
             this.pendingStart = (territory, overrides, roster);
             this.foodTries = 1;
             this.nextFoodTry = DateTime.UtcNow.AddMilliseconds(700);
-            this.Chat("[CruciblePilot] waiting for the food buff before starting the run");
+            this.Chat($"[CruciblePilot] refilling food ({(foodMinutes > 0 ? foodMinutes.ToString("0") + " min left" : "no buff")}) before starting the run");
             return;
         }
 
@@ -509,10 +512,10 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        if (this.food.HasFood())
+        if (this.food.RemainingFoodMinutes() >= this.Config.FoodRefreshMinutes)
         {
             this.pendingStart = null;
-            this.Chat("[CruciblePilot] food buff is up - starting the run");
+            this.Chat($"[CruciblePilot] food refreshed ({this.food.RemainingFoodMinutes():0} min left) - starting the run");
             this.StartRunNow(pending.Territory, pending.Overrides, pending.Roster);
             return;
         }

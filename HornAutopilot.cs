@@ -380,36 +380,38 @@ public sealed unsafe class HornAutopilot
         "fire", "ice", "wind", "earth", "lightning", "water", "holy", "dark", "blunt", "piercing", "slashing",
     };
 
-    /// <summary>Weakness tags shown in the stage window ("Weakness:" followed by e.g. "Blunt").</summary>
+    /// <summary>
+    /// Weakness tags shown in the stage window. Every weakness value is a standalone string carrying the element
+    /// icon (so " Wind", " Water"); labels like "Strength" or "Phys. Resistance" are not in the word set, so scanning
+    /// all strings catches every enemy's weakness instead of only the first one.
+    /// </summary>
     private static List<string> ExtractWeaknesses(IReadOnlyList<string> stageText)
     {
         var tags = new List<string>();
-        for (int i = 0; i + 1 < stageText.Count; i++)
+        foreach (string raw in stageText)
         {
-            if (!stageText[i].Trim().Equals("Weakness:", StringComparison.OrdinalIgnoreCase))
+            string letters = new string(raw.Where(char.IsLetter).ToArray());
+            if (letters.Length == 0 || letters.Length > 12)
             {
                 continue;
             }
 
-            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(stageText[i + 1], "[A-Za-z]+"))
+            string word = letters.ToLowerInvariant();
+            if (!WeaknessWords.Contains(word))
             {
-                string word = match.Value.ToLowerInvariant();
-                if (!WeaknessWords.Contains(word))
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                string tag = word switch
-                {
-                    "slashing" => "slash",
-                    "piercing" => "pierce",
-                    _ => word,
-                };
+            string tag = word switch
+            {
+                "slashing" => "slash",
+                "piercing" => "pierce",
+                _ => word,
+            };
 
-                if (!tags.Contains(tag))
-                {
-                    tags.Add(tag);
-                }
+            if (!tags.Contains(tag))
+            {
+                tags.Add(tag);
             }
         }
 

@@ -76,6 +76,9 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Food item the plugin asks the game to use.</summary>
     public string FoodItemName { get; set; } = "Rock-fisted Popoto Stew";
 
+    /// <summary>Re-eat when the Well Fed buff has less than this many minutes left.</summary>
+    public int FoodRefreshMinutes { get; set; } = 20;
+
     /// <summary>Prefer the curated per-encounter trio table over the weakness scoring.</summary>
     public bool UseDefaults { get; set; } = true;
 
