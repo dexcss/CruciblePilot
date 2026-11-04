@@ -133,9 +133,12 @@ public sealed unsafe class HornAutopilot
             return;
         }
 
-        var selected = rows.Where(r => r.Selection < 3).ToList();
+        var selected = rows.Where(r => r.Selection < 3).OrderBy(r => r.Selection).ToList();
+        bool enforceOrder = this.plugin.Config.EnforceHornOrder;
         bool done = selected.Count == 3 &&
-                    selected.Select(r => r.Number).OrderBy(x => x).SequenceEqual(target.OrderBy(x => x));
+                    (enforceOrder
+                        ? selected.Select(r => r.Number).SequenceEqual(target)
+                        : selected.Select(r => r.Number).OrderBy(x => x).SequenceEqual(target.OrderBy(x => x)));
 
         if (done)
         {
@@ -149,9 +152,34 @@ public sealed unsafe class HornAutopilot
                 this.Fire(stage, 8);
                 this.lastConfirm = DateTime.UtcNow;
                 this.log.Information($"[CP] Trio ({string.Join(",", target)}) on the horns - starting the fight");
-                this.plugin.CpLog.Info($"starting fight with {string.Join(",", target)}");
+                this.plugin.CpLog.Info($"starting fight with {string.Join(",", target)}" +
+                                       (enforceOrder ? $" (horn order {string.Join(" | ", target)})" : string.Empty));
             }
 
+            return;
+        }
+
+        if (enforceOrder)
+        {
+            // Clear anything that is not in the wanted slot, one toggle per tick; picks then land in list order.
+            var wrongSlot = selected.FirstOrDefault(r => r.Selection >= target.Count || target[(int)r.Selection] != r.Number);
+            if (wrongSlot != null)
+            {
+                this.Toggle(party, wrongSlot);
+                return;
+            }
+
+            foreach (uint number in target)
+            {
+                var row = rows.FirstOrDefault(r => r.Number == number && r.Selection >= 3 && (r.MaxHp == 0 || r.Hp != 0));
+                if (row != null)
+                {
+                    this.Toggle(party, row);
+                    return;
+                }
+            }
+
+            this.Warn("no selectable familiar for the configured trio (all knocked out?)");
             return;
         }
 

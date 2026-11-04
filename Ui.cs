@@ -141,6 +141,13 @@ public sealed class Ui
             this.plugin.SaveConfig();
         }
 
+        bool enforceOrder = config.EnforceHornOrder;
+        if (ImGui.Checkbox("Assign horns in trio order (for One With Nature)", ref enforceOrder))
+        {
+            config.EnforceHornOrder = enforceOrder;
+            this.plugin.SaveConfig();
+        }
+
         bool setTeam = config.SetAutoDutyTeam;
         if (ImGui.Checkbox("Push roster into AutoDuty's custom team", ref setTeam))
         {

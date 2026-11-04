@@ -42,6 +42,9 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Pick the trio from the enemies currently in the arena instead of the fixed list.</summary>
     public bool AutoPick { get; set; } = true;
 
+    /// <summary>Assign the trio to the battlehorns in list order so One With Nature (Tempered/Borrow) lines up.</summary>
+    public bool EnforceHornOrder { get; set; } = true;
+
     /// <summary>Eat the configured food before a run when the Well Fed buff is missing.</summary>
     public bool EatFood { get; set; } = true;
 
