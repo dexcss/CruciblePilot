@@ -12,9 +12,9 @@ public static class CrucibleData
 {
     public static readonly (string Label, string[] Patterns, uint[] Trio)[] Board1 =
     {
-        ("Bone Knight/Bishop - blunt", new[] { "bone knight", "bone bishop" }, new uint[] { 5, 31, 1 }),
-        ("Arch Demon/Piscodemon - lightning/slash", new[] { "arch demon", "piscodemon" }, new uint[] { 13, 1, 25 }),
-        ("Banemite/Mitelings - ice", new[] { "banemite", "mitelings" }, new uint[] { 21, 1, 5 }),
+        ("Bone Knight/Bishop - blunt", new[] { "bone knight", "bone bishop" }, new uint[] { 5, 31, 25 }),
+        ("Arch Demon/Piscodemon - lightning/slash", new[] { "arch demon", "piscodemon" }, new uint[] { 13, 33, 25 }),
+        ("Banemite/Mitelings - ice", new[] { "banemite", "mitelings" }, new uint[] { 21, 5, 25 }),
         ("Ogre/Wisps - wind/water", new[] { "ogre", "wisp" }, new uint[] { 11, 40, 4 }),
         ("Pas de Seul - pierce, fire adds", new[] { "pas de seul", "succubus" }, new uint[] { 1, 29, 31 }),
     };
