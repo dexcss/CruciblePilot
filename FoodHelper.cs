@@ -44,7 +44,7 @@ public sealed class FoodHelper
     }
 
     /// <summary>Eats the configured food when the buff is missing and food eating is enabled.</summary>
-    public void EnsureFood(Configuration config)
+    public void TryEat(Configuration config)
     {
         if (!config.EatFood)
         {
@@ -88,6 +88,10 @@ public sealed class FoodHelper
                 0,
                 null);
             this.plugin.CpLog.Info($"food: UseAction(Item, {useId} \"{config.FoodItemName}\", nq {normal} hq {hq}) = {used}");
+            if (!used)
+            {
+                this.plugin.CpLog.Warn("food: the game refused the item action (already Well Fed, in combat, or a menu is open)");
+            }
         }
     }
 

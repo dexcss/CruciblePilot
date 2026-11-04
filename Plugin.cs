@@ -28,6 +28,9 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Ui ui;
     private readonly CpLog cpLog;
     private bool pushedOverrides;
+    private (uint Territory, Dictionary<string, string> Overrides, List<uint> Roster)? pendingStart;
+    private int foodTries;
+    private DateTime nextFoodTry;
 
     public Plugin(
         IDalamudPluginInterface pluginInterface,
@@ -129,7 +132,11 @@ public sealed class Plugin : IDalamudPlugin
         return $"Auto pick: {this.horns.LastPickReason} | seen: {enemies}";
     }
 
-    private void OnFrameworkUpdate(IFramework fw) => this.horns.Tick();
+    private void OnFrameworkUpdate(IFramework fw)
+    {
+        this.horns.Tick();
+        this.TickPendingStart();
+    }
 
     private void OnCommand(string command, string arguments)
     {
@@ -321,7 +328,6 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        this.food.EnsureFood(this.Config);
         this.cpLog.Info("run: board=" + this.Config.Board + " degree=" + Configuration.DegreeName(this.Config.Degree) + " roster=[" + string.Join(",", roster) + "]");
         if (this.Config.SetAutoDutyTeam)
         {
@@ -340,6 +346,22 @@ public sealed class Plugin : IDalamudPlugin
             ["DutyConfig.RotationPlugin"] = "RotationSolverReborn",
         };
 
+        // Wait for the meal buff before entering: eating has to happen out of the duty and takes a moment to apply.
+        if (this.Config.EatFood && !this.food.HasFood())
+        {
+            this.food.TryEat(this.Config);
+            this.pendingStart = (territory, overrides, roster);
+            this.foodTries = 1;
+            this.nextFoodTry = DateTime.UtcNow.AddMilliseconds(700);
+            this.Chat("[CruciblePilot] waiting for the food buff before starting the run");
+            return;
+        }
+
+        this.StartRunNow(territory, overrides, roster);
+    }
+
+    private void StartRunNow(uint territory, Dictionary<string, string> overrides, List<uint> roster)
+    {
         if (!this.autoDuty.Push(overrides))
         {
             this.cpLog.Error("AutoDuty rejected the run settings");
@@ -363,6 +385,40 @@ public sealed class Plugin : IDalamudPlugin
             this.pushedOverrides = false;
             this.Chat("[CruciblePilot] AutoDuty.Run failed: " + ex.Message);
         }
+    }
+
+    private void TickPendingStart()
+    {
+        if (this.pendingStart is not { } pending)
+        {
+            return;
+        }
+
+        if (this.food.HasFood())
+        {
+            this.pendingStart = null;
+            this.Chat("[CruciblePilot] food buff is up - starting the run");
+            this.StartRunNow(pending.Territory, pending.Overrides, pending.Roster);
+            return;
+        }
+
+        if (DateTime.UtcNow < this.nextFoodTry)
+        {
+            return;
+        }
+
+        if (this.foodTries >= 8)
+        {
+            this.pendingStart = null;
+            this.Chat("[CruciblePilot] food buff did not apply - starting anyway");
+            this.cpLog.Warn("food: buff never appeared after 8 attempts; starting without it");
+            this.StartRunNow(pending.Territory, pending.Overrides, pending.Roster);
+            return;
+        }
+
+        this.foodTries++;
+        this.food.TryEat(this.Config);
+        this.nextFoodTry = DateTime.UtcNow.AddMilliseconds(700);
     }
 
     public void StopRun()
