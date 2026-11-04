@@ -54,6 +54,8 @@ public sealed class CrucibleCombat
     private DateTime comboAt = DateTime.MinValue;
     private int hornStage;
     private DateTime summonPendingUntil = DateTime.MinValue;
+    private DateTime lastSummonAt = DateTime.MinValue;
+    private DateTime nextDiagnostic = DateTime.MinValue;
     private DateTime countdownStartedAt = DateTime.MinValue;
     private bool countdownHorn3;
     private bool countdownBorrow;
@@ -116,6 +118,12 @@ public sealed class CrucibleCombat
 
         this.nextTick = DateTime.UtcNow.AddMilliseconds(100);
 
+        if (DateTime.UtcNow >= this.nextDiagnostic)
+        {
+            this.nextDiagnostic = DateTime.UtcNow.AddSeconds(5);
+            this.LogDiagnostics(player);
+        }
+
         var actionManager = ActionManager.Instance();
         if (actionManager == null)
         {
@@ -152,7 +160,8 @@ public sealed class CrucibleCombat
         }
 
         // Battlehorns: only when no familiar is out, 3s pending for the cast, cycling slots.
-        if (this.plugin.Config.CombatHorns && !this.HasFamiliar(player) && DateTime.UtcNow >= this.summonPendingUntil)
+        if (this.plugin.Config.CombatHorns && !this.HasFamiliar(player) && DateTime.UtcNow >= this.summonPendingUntil &&
+            DateTime.UtcNow - this.lastSummonAt > TimeSpan.FromSeconds(8))
         {
             uint horn = Horns[this.hornStage % Horns.Length];
             if (actionManager->GetActionStatus(ActionType.Action, horn) == 0 &&
@@ -161,6 +170,7 @@ public sealed class CrucibleCombat
                 this.plugin.CpLog.Info($"combat: summon horn {(this.hornStage % Horns.Length) + 1}");
                 this.hornStage = (this.hornStage + 1) % Horns.Length;
                 this.summonPendingUntil = DateTime.UtcNow.AddSeconds(3);
+                this.lastSummonAt = DateTime.UtcNow;
                 return;
             }
         }
@@ -209,19 +219,19 @@ public sealed class CrucibleCombat
 
         if (BeastGauge.TryRead(out var gauge))
         {
-            if (gauge.NaturalInstinct > 0 &&
+            if (gauge.SoulStacks > 0 &&
                 actionManager->GetActionStatus(ActionType.Action, RallyingCheer) == 0 &&
                 actionManager->UseAction(ActionType.Action, RallyingCheer, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
             {
-                this.plugin.CpLog.Info($"combat: ogcd cheer (natural {gauge.NaturalInstinct})");
+                this.plugin.CpLog.Info($"combat: ogcd cheer (natural {gauge.SoulStacks})");
                 return;
             }
 
-            if (gauge.MasteredInstinct > 0 &&
+            if (gauge.HeartStacks > 0 &&
                 actionManager->GetActionStatus(ActionType.Action, Rally) == 0 &&
                 actionManager->UseAction(ActionType.Action, Rally, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
             {
-                this.plugin.CpLog.Info($"combat: ogcd rally (mastered {gauge.MasteredInstinct})");
+                this.plugin.CpLog.Info($"combat: ogcd rally (mastered {gauge.HeartStacks})");
                 return;
             }
         }
@@ -242,6 +252,7 @@ public sealed class CrucibleCombat
             actionManager->UseAction(ActionType.Action, gcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
         {
             this.comboAt = DateTime.UtcNow;
+            this.plugin.CpLog.Info($"combat: gcd {gcd}");
             this.comboStage = gcd switch
             {
                 SmashAxe => 1,
@@ -383,6 +394,21 @@ public sealed class CrucibleCombat
                 this.plugin.CpLog.Info($"combat: used potion #{potion} from slot {entry.Slot} at {hp:F0}% hp");
                 return;
             }
+        }
+    }
+
+    private void LogDiagnostics(IPlayerCharacter player)
+    {
+        try
+        {
+            var pets = this.objects.OfType<IBattleNpc>().Where(n => n.OwnerId != 0).Select(n => $"{n.Name}#{n.BaseId}/owner={n.OwnerId:X}/hp={n.CurrentHp}").Take(6);
+            string gaugeText = BeastGauge.TryRead(out var g)
+                ? $"tp={g.TpGauge} petTp={g.PetTpGauge} soul={g.SoulStacks} power={g.BeastPower} whistle={g.WhistleIndex} heart={g.HeartStacks} horn={g.ActiveBattlehorn}"
+                : "gauge?";
+            this.plugin.CpLog.Info("combat diag: player={player.GameObjectId:X} pets=[" + string.Join(", ", pets) + "] " + gaugeText);
+        }
+        catch (Exception)
+        {
         }
     }
 

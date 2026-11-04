@@ -5,18 +5,19 @@ using FFXIVClientStructs.FFXIV.Client.Game.Gauge;
 namespace CruciblePilot;
 
 /// <summary>
-/// Reads the Beastmaster job gauge the same way the ACR does: TP gauge, active battlehorn, instinct stacks and
-/// the per-horn beast values, straight from the game's job gauge manager.
+/// Reads the Beastmaster job gauge. The struct fields are used for TP, but the whistle/instinct values are read
+/// from the raw gauge bytes because that is how the ACR reads them (offsets 16, 17, 19 and 24).
 /// </summary>
 public static unsafe class BeastGauge
 {
     public readonly record struct Snapshot(
         byte TpGauge,
         byte PetTpGauge,
-        byte ActiveBattlehorn,
-        byte InstinctualComboState,
-        byte NaturalInstinct,
-        byte MasteredInstinct);
+        byte SoulStacks,
+        byte BeastPower,
+        byte WhistleIndex,
+        byte HeartStacks,
+        byte ActiveBattlehorn);
 
     public static bool TryRead(out Snapshot snapshot)
     {
@@ -33,13 +34,15 @@ public static unsafe class BeastGauge
             return false;
         }
 
+        byte* raw = (byte*)gauge;
         snapshot = new Snapshot(
             gauge->TPGauge,
             gauge->PetTPGauge,
-            gauge->ActiveBattlehorn,
-            gauge->InstinctualComboState,
-            (byte)(gauge->InstinctState & 0x3),
-            (byte)((gauge->InstinctState >> 2) & 0x3));
+            raw[16],
+            raw[17],
+            raw[19],
+            raw[24],
+            gauge->ActiveBattlehorn);
         return true;
     }
 }
