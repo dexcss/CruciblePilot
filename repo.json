@@ -3,8 +3,8 @@
     "Author": "dexcss",
     "Name": "CruciblePilot",
     "InternalName": "CruciblePilot",
-    "AssemblyVersion": "0.17.0.0",
-    "TestingAssemblyVersion": "0.17.0.0",
+    "AssemblyVersion": "0.17.1.0",
+    "TestingAssemblyVersion": "0.17.1.0",
     "Description": "Drives FFXIV's Crucible of the Unbroken through AutoDuty: picks the difficulty (Standard through Third Degree), registers your team, reads the enemies and weaknesses from the stage window, scores your familiars per encounter and puts the best three on the battlehorns before every fight, then starts it. Includes a settings window, per-board rosters, a food check and a run log for troubleshooting.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/dexcss/CruciblePilot",
@@ -16,14 +16,14 @@
     ],
     "DalamudApiLevel": 15,
     "TestingDalamudApiLevel": 15,
-    "DownloadLinkInstall": "https://github.com/dexcss/CruciblePilot/releases/download/v0.17.0.0/CruciblePilot.zip",
-    "DownloadLinkTesting": "https://github.com/dexcss/CruciblePilot/releases/download/v0.17.0.0/CruciblePilot.zip",
-    "DownloadLinkUpdate": "https://github.com/dexcss/CruciblePilot/releases/download/v0.17.0.0/CruciblePilot.zip",
+    "DownloadLinkInstall": "https://github.com/dexcss/CruciblePilot/releases/download/v0.17.1.0/CruciblePilot.zip",
+    "DownloadLinkTesting": "https://github.com/dexcss/CruciblePilot/releases/download/v0.17.1.0/CruciblePilot.zip",
+    "DownloadLinkUpdate": "https://github.com/dexcss/CruciblePilot/releases/download/v0.17.1.0/CruciblePilot.zip",
     "CategoryTags": [
       "Utility",
       "Automation"
     ],
     "AcceptsFeedback": true,
-    "Changelog": "v0.17.0.0: downloads now use the versioned release URL so Dalamud cannot hand back a stale asset (the 0.4.2->0.4.3 update failed with 'distributed plugin version does not match repo version'). Also: Banemite default trio 31,13,25 (Gigantoad/Geshunpest/Adamantoise) and board-1 roster includes Adamantoise. v0.17.0.0: waits for the Well Fed buff before entering, retries the meal, logs refusals. v0.4.1.x: food via ActionManager UseAction like Artisan (HQ preferred). v0.4.0.0: no fallback trio; weakness-line scoring; board naming; food check. v0.3.5.0: stage-window enemies drive the pick; owned pets excluded."
+    "Changelog": "v0.17.1.0: downloads now use the versioned release URL so Dalamud cannot hand back a stale asset (the 0.4.2->0.4.3 update failed with 'distributed plugin version does not match repo version'). Also: Banemite default trio 31,13,25 (Gigantoad/Geshunpest/Adamantoise) and board-1 roster includes Adamantoise. v0.17.1.0: waits for the Well Fed buff before entering, retries the meal, logs refusals. v0.4.1.x: food via ActionManager UseAction like Artisan (HQ preferred). v0.4.0.0: no fallback trio; weakness-line scoring; board naming; food check. v0.3.5.0: stage-window enemies drive the pick; owned pets excluded."
   }
 ]

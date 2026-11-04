@@ -60,6 +60,7 @@ public sealed class CrucibleCombat
     private DateTime lastMovedAt = DateTime.MinValue;
     private DateTime nextDiagnostic = DateTime.MinValue;
     private DateTime lastPotionAt = DateTime.MinValue;
+    private DateTime nextRangeLog = DateTime.MinValue;
     private DateTime countdownStartedAt = DateTime.MinValue;
     private bool countdownHorn3;
     private bool countdownBorrow;
@@ -155,6 +156,30 @@ public sealed class CrucibleCombat
         }
 
         var target = this.EnsureTarget();
+
+        // Melee actions whiff from range, so never fire them out of reach. Use the ranged fallback and let the
+        // routing plugin close the distance.
+        if (target != null)
+        {
+            float targetDistance = Distance(player.Position, target.Position);
+            if (targetDistance > 3.2f)
+            {
+                if (DateTime.UtcNow >= this.nextRangeLog)
+                {
+                    this.nextRangeLog = DateTime.UtcNow.AddSeconds(5);
+                    this.plugin.CpLog.Info($"combat: target {targetDistance:F1}m away, holding melee");
+                }
+
+                if (this.plugin.Config.CombatRangedFallback &&
+                    actionManager->GetActionStatus(ActionType.Action, RangedFallback) == 0 &&
+                    actionManager->UseAction(ActionType.Action, RangedFallback, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
+                {
+                    this.plugin.CpLog.Info($"combat: ranged fallback at {targetDistance:F1}m");
+                }
+
+                return;
+            }
+        }
 
         // Downtime axe: no enemy to hit, so spend the TP on Avalanche Axe when it is ready.
         if (target == null)
@@ -479,7 +504,7 @@ public sealed class CrucibleCombat
             string gaugeText = BeastGauge.TryRead(out var g)
                 ? $"tp={g.TpGauge} petTp={g.PetTpGauge} soul={g.SoulStacks} power={g.BeastPower} whistle={g.WhistleIndex} heart={g.HeartStacks} horn={g.ActiveBattlehorn}"
                 : "gauge?";
-            this.plugin.CpLog.Info("combat diag: player={player.GameObjectId:X} pets=[" + string.Join(", ", pets) + "] " + gaugeText);
+            this.plugin.CpLog.Info($"combat diag: player={player.GameObjectId:X} pets=[" + string.Join(", ", pets) + "] " + gaugeText);
         }
         catch (Exception)
         {
@@ -529,13 +554,23 @@ public sealed class CrucibleCombat
 
     private IBattleNpc? EnsureTarget()
     {
+        var player = this.objects.LocalPlayer;
+        if (player == null)
+        {
+            return null;
+        }
+
+        // Melee job: always fight what we can actually reach. Keep the current target only if it is alive and
+        // still close; otherwise pick the nearest hostile.
         var current = this.targetManager.Target as IBattleNpc;
-        if (current != null && current.CurrentHp > 0 && current.IsTargetable)
+        if (current != null && current.CurrentHp > 0 && current.IsTargetable &&
+            Distance(player.Position, current.Position) <= 5f)
         {
             return current;
         }
 
-        IBattleNpc? best = null;
+        IBattleNpc? nearest = null;
+        float nearestDistance = float.MaxValue;
         foreach (var obj in this.objects)
         {
             if (obj is not IBattleNpc npc || npc.CurrentHp == 0 || !npc.IsTargetable || npc.ObjectKind != ObjectKind.BattleNpc)
@@ -543,18 +578,20 @@ public sealed class CrucibleCombat
                 continue;
             }
 
-            if (npc.MaxHp > (best?.MaxHp ?? 0))
+            float distance = Distance(player.Position, npc.Position);
+            if (distance < nearestDistance)
             {
-                best = npc;
+                nearestDistance = distance;
+                nearest = npc;
             }
         }
 
-        if (best != null)
+        if (nearest != null)
         {
-            this.targetManager.Target = best;
+            this.targetManager.Target = nearest;
         }
 
-        return best;
+        return nearest;
     }
 
     private static float Distance(System.Numerics.Vector3 a, System.Numerics.Vector3 b)
