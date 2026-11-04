@@ -26,6 +26,8 @@ public sealed class CrucibleCombat
     private const uint Trick = 47093;
     private const uint PartingBlow = 44891;
     private const uint BeastMode = 44886;
+    private const uint RallyingCheer = 44904;
+    private const uint Rally = 44905;
     private const uint ShieldCharge = 44893;
     private const uint TemperedRelease = 44890;
     private const uint Borrow = 44895;
@@ -137,7 +139,31 @@ public sealed class CrucibleCombat
         }
 
         // oGCDs first so they weave before the GCD lock.
-        foreach (uint ogcd in new[] { ShieldCharge, BeastMode, Trick, PartingBlow })
+        // oGCD priority, mirroring the XSZYYS resolver order: shield charge, borrow/beast mode, rallying cheer,
+        // rally, trick, parting blow. Action status gates cooldowns and unmet requirements.
+        if (actionManager->GetActionStatus(ActionType.Action, ShieldCharge) == 0 &&
+            actionManager->UseAction(ActionType.Action, ShieldCharge, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+        {
+            this.plugin.CpLog.Info("combat: ogcd shield charge");
+            return;
+        }
+
+        if (this.HasFamiliar(player) &&
+            actionManager->GetActionStatus(ActionType.Action, Borrow) == 0 &&
+            actionManager->UseAction(ActionType.Action, Borrow, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+        {
+            this.plugin.CpLog.Info("combat: ogcd borrow");
+            return;
+        }
+
+        if (actionManager->GetActionStatus(ActionType.Action, BeastMode) == 0 &&
+            actionManager->UseAction(ActionType.Action, BeastMode, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+        {
+            this.plugin.CpLog.Info("combat: ogcd beast mode");
+            return;
+        }
+
+        foreach (uint ogcd in new[] { RallyingCheer, Rally, Trick, PartingBlow })
         {
             if (actionManager->GetActionStatus(ActionType.Action, ogcd) == 0 &&
                 actionManager->UseAction(ActionType.Action, ogcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
