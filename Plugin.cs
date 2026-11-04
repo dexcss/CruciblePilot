@@ -23,6 +23,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly WhistleHelper whistle;
     private readonly CrucibleItems crucibleItems;
     private readonly CrucibleCombat crucibleCombat;
+    private readonly XszyysBridge bridge;
+    private readonly IClientState clientState;
     private readonly Ui ui;
     private readonly CpLog cpLog;
 
@@ -51,6 +53,8 @@ public sealed class Plugin : IDalamudPlugin
         this.whistle = new WhistleHelper(this, objects, targetManager, condition, clientState, gameGui);
         this.crucibleItems = new CrucibleItems(interop, gameGui, log);
         this.crucibleCombat = new CrucibleCombat(this, objects, targetManager, condition, clientState, gameGui, this.crucibleItems);
+        this.clientState = clientState;
+        this.bridge = new XszyysBridge(log, this.cpLog, targetManager);
         this.ui = new Ui(this);
 
         this.commands.AddHandler(CommandName, new CommandInfo(this.OnCommand)
@@ -63,7 +67,12 @@ public sealed class Plugin : IDalamudPlugin
         this.framework.Update += this.OnFrameworkUpdate;
 
         this.cpLog.Info($"loaded v{typeof(Plugin).Assembly.GetName().Version} - log file ");
-        this.cpLog.Info($"config: degree={this.Config.Degree} forceDegree={this.Config.ForceDegree} combat={this.Config.EnableCombat} whistle={this.Config.WhistlePlan}");
+        this.cpLog.Info($"config: degree={this.Config.Degree} forceDegree={this.Config.ForceDegree} combat={this.Config.EnableCombat} whistle={this.Config.WhistlePlan} bridge={this.Config.UseXszyysBridge}");
+
+        if (this.Config.UseXszyysBridge)
+        {
+            this.bridge.TryLoad();
+        }
         this.log.Information("[CP] CruciblePilot loaded");
     }
 
@@ -80,6 +89,7 @@ public sealed class Plugin : IDalamudPlugin
         this.framework.Update -= this.OnFrameworkUpdate;
         this.pluginInterface.UiBuilder.Draw -= this.ui.Draw;
         this.commands.RemoveHandler(CommandName);
+        this.bridge.Dispose();
         this.crucibleItems.Dispose();
         this.cpLog.Info("unloaded");
         this.cpLog.Dispose();
@@ -92,6 +102,14 @@ public sealed class Plugin : IDalamudPlugin
     {
         this.degree.Tick();
         this.whistle.Tick();
-        this.crucibleCombat.Tick();
+
+        if (this.Config.UseXszyysBridge && this.bridge.Loaded)
+        {
+            this.bridge.Tick(this.clientState.TerritoryType);
+        }
+        else
+        {
+            this.crucibleCombat.Tick();
+        }
     }
 }

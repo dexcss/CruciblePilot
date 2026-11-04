@@ -16,6 +16,9 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Keep forcing the degree on every stage window.</summary>
     public bool ForceDegree { get; set; } = true;
 
+    /// <summary>Run the ACR resolvers directly through the bridge (their compiled logic, our tick and submission).</summary>
+    public bool UseXszyysBridge { get; set; } = true;
+
     /// <summary>Run the built-in Beastmaster Crucible rotation (turn RSR off for Beastmaster).</summary>
     public bool EnableCombat { get; set; } = true;
 
