@@ -30,6 +30,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ICondition condition;
     private readonly HornAutopilot horns;
     private readonly DegreeHelper degree;
+    private readonly WhistleHelper whistle;
     private readonly Ui ui;
     private readonly CpLog cpLog;
     private bool pushedOverrides;
@@ -47,7 +48,8 @@ public sealed class Plugin : IDalamudPlugin
         IClientState clientState,
         IObjectTable objects,
         IDataManager data,
-        ICondition condition)
+        ICondition condition,
+        ITargetManager targetManager)
     {
         Instance = this;
         this.pluginInterface = pluginInterface;
@@ -75,6 +77,7 @@ public sealed class Plugin : IDalamudPlugin
         }
         this.horns = new HornAutopilot(this, log, gameGui, clientState);
         this.degree = new DegreeHelper(this, gameGui, clientState);
+        this.whistle = new WhistleHelper(this, objects, targetManager, condition, clientState);
         this.ui = new Ui(this);
 
         this.commands.AddHandler(CommandName, new CommandInfo(this.OnCommand)
@@ -156,6 +159,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         this.horns.Tick();
         this.degree.Tick();
+        this.whistle.Tick();
         this.TickPendingStart();
         this.TickCrucibleBuffs();
     }

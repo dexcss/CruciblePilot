@@ -31,6 +31,18 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Force the Crucible Mode (degree) on the pre-battle window, for runs driven by another plugin (Pawprint).</summary>
     public bool ForceDegree { get; set; } = true;
 
+    /// <summary>
+    /// XSZYYS-style whistle plan: press Tempered Release when the current target is below the active horn's
+    /// finisher threshold (the values the shared whistle presets use).
+    /// </summary>
+    public bool WhistlePlan { get; set; } = true;
+
+    /// <summary>Finisher HP% per horn slot: first horn, second horn, third horn.</summary>
+    public List<int> WhistleThresholds { get; set; } = new() { 10, 40, 20 };
+
+    /// <summary>Use Borrow instead of Tempered Release for the third horn (the "AutoBorrow" preset flag).</summary>
+    public bool WhistleAutoBorrow { get; set; }
+
     /// <summary>Per-board meta trios taken from those presets.</summary>
     public Dictionary<int, List<uint>> MetaTrios { get; set; } = new()
     {

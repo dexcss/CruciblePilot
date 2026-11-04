@@ -102,6 +102,19 @@ public sealed class Ui
             ImGui.TextUnformatted("Meta trio for this board: " + string.Join(", ", config.MetaTrio(config.Board)));
         }
 
+        bool whistle = config.WhistlePlan;
+        if (ImGui.Checkbox("XSZYYS-style whistle finisher (Tempered Release at horn HP%)", ref whistle))
+        {
+            config.WhistlePlan = whistle;
+            this.plugin.SaveConfig();
+        }
+
+        if (config.WhistlePlan)
+        {
+            ImGui.TextUnformatted("Finisher thresholds: horn1 " + config.WhistleThresholds[0] + "%, horn2 " +
+                config.WhistleThresholds[1] + "%, horn3 " + config.WhistleThresholds[2] + "%");
+        }
+
         bool scoreMode = config.ScoreMode;
         if (ImGui.Checkbox("Score mode (3 beasts, no shop/items/rest - for Legendary/leaderboard)", ref scoreMode))
         {
