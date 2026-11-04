@@ -31,6 +31,9 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Use the ranged fallback action when the target is out of melee reach.</summary>
     public bool CombatRangedFallback { get; set; } = true;
 
+    /// <summary>Use the 250 TP burst actions when a burst status is up.</summary>
+    public bool CombatBurst { get; set; } = true;
+
     /// <summary>Use Capture to mark targets (capture runs only).</summary>
     public bool CombatCapture { get; set; }
 

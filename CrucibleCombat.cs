@@ -266,7 +266,7 @@ public sealed class CrucibleCombat
                 return;
             }
 
-            uint earlyGcd = this.PickGcd(actionManager);
+            uint earlyGcd = this.PickGcd(actionManager, player);
             if (earlyGcd != 0 &&
                 actionManager->UseAction(ActionType.Action, earlyGcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
@@ -324,7 +324,16 @@ public sealed class CrucibleCombat
             }
         }
 
-        foreach (uint ogcd in new[] { Burst, Trick, PartingBlow })
+        // Trick costs 100 TP and pairs with the axe combo, so only weave it when the gauge supports the combo.
+        if (BeastGauge.TryRead(out var trickGauge) && trickGauge.TpGauge >= 100 && trickGauge.BeastPower >= 100 &&
+            actionManager->GetActionStatus(ActionType.Action, Trick) == 0 &&
+            actionManager->UseAction(ActionType.Action, Trick, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
+        {
+            this.plugin.CpLog.Info($"combat: ogcd trick (tp {trickGauge.TpGauge} power {trickGauge.BeastPower})");
+            return;
+        }
+
+        foreach (uint ogcd in new[] { Burst, PartingBlow })
         {
             if (actionManager->GetActionStatus(ActionType.Action, ogcd) == 0 &&
                 actionManager->UseAction(ActionType.Action, ogcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
@@ -340,7 +349,7 @@ public sealed class CrucibleCombat
             return;
         }
 
-        uint gcd = this.PickGcd(actionManager);
+        uint gcd = this.PickGcd(actionManager, player);
         if (gcd != 0 &&
             actionManager->UseAction(ActionType.Action, gcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
@@ -447,27 +456,89 @@ public sealed class CrucibleCombat
         => actionManager->GetActionStatus(ActionType.Action, action) == 0 &&
            actionManager->UseAction(ActionType.Action, action, targetId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null);
 
-    private unsafe uint PickGcd(ActionManager* actionManager)
+    private unsafe uint PickGcd(ActionManager* actionManager, IPlayerCharacter player)
     {
-        if (this.comboStage == 2 && actionManager->GetActionStatus(ActionType.Action, Shieldsplitter) == 0)
+        bool gaugeOk = BeastGauge.TryRead(out var gauge);
+        bool hasTp100 = !gaugeOk || gauge.TpGauge >= 100;
+        bool hasTp250 = gaugeOk && gauge.TpGauge >= 250;
+        bool hasPower100 = !gaugeOk || gauge.BeastPower >= 100;
+
+        // Burst: needs 250 TP and one of the burst statuses (4599 / 4600).
+        if (hasTp250 && this.plugin.Config.CombatBurst)
         {
-            return Shieldsplitter;
+            uint burst = 0;
+            if (HasStatus(player, 4599))
+            {
+                burst = 44931;
+            }
+            else if (HasStatus(player, 4600))
+            {
+                burst = 44930;
+            }
+
+            if (burst != 0 && actionManager->GetActionStatus(ActionType.Action, burst) == 0)
+            {
+                return burst;
+            }
         }
 
-        if (this.comboStage == 1 && actionManager->GetActionStatus(ActionType.Action, AxebladeBite) == 0)
+        // Axe combo: 100 beast power and 100 TP, cycling the attribute axes.
+        if (hasPower100 && hasTp100)
+        {
+            uint axe = AttributeAxe(player);
+            if (axe != 0 && actionManager->GetActionStatus(ActionType.Action, axe) == 0)
+            {
+                return axe;
+            }
+        }
+
+        // Filler: the weapon combo, driven by the game's own last combo id.
+        uint lastCombo = actionManager->Combo.Action;
+        if (lastCombo == SmashAxe && actionManager->GetActionStatus(ActionType.Action, AxebladeBite) == 0)
         {
             return AxebladeBite;
         }
 
-        foreach (uint spender in new[] { AvalancheAxe, MistralAxe, SpinningAxe, GaleAxe })
+        if (lastCombo == AxebladeBite && actionManager->GetActionStatus(ActionType.Action, Shieldsplitter) == 0)
         {
-            if (actionManager->GetActionStatus(ActionType.Action, spender) == 0)
-            {
-                return spender;
-            }
+            return Shieldsplitter;
         }
 
         return actionManager->GetActionStatus(ActionType.Action, SmashAxe) == 0 ? SmashAxe : 0;
+    }
+
+    /// <summary>Cycles the attribute axes: 4596 -> Mistral, 4597 -> Spinning, 4598 -> Gale, 4595 -> Avalanche.</summary>
+    private static uint AttributeAxe(IPlayerCharacter player)
+    {
+        if (HasStatus(player, 4596))
+        {
+            return MistralAxe;
+        }
+
+        if (HasStatus(player, 4597))
+        {
+            return SpinningAxe;
+        }
+
+        if (HasStatus(player, 4598))
+        {
+            return GaleAxe;
+        }
+
+        return AvalancheAxe;
+    }
+
+    private static bool HasStatus(IPlayerCharacter player, uint statusId)
+    {
+        foreach (var status in player.StatusList)
+        {
+            if (status.StatusId == statusId)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private unsafe void TickPotions(IPlayerCharacter player)
