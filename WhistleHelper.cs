@@ -3,12 +3,15 @@ using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace CruciblePilot;
 
 /// <summary>
 /// Emulates the XSZYYS ACR's whistle plan for the parts RSR cannot do: the Tempered Release finisher at the
-/// per-horn HP thresholds taken from the shared whistle presets (horn 1 ~10%, horn 2 ~40%, horn 3 ~20%).
+/// per-horn HP thresholds from the shared whistle presets (horn 1 ~10%, horn 2 ~40%, horn 3 ~20%).
+/// Horn slots have only a 2 second recast, so the active slot is latched when a horn is cast and kept until the
+/// next horn, instead of being re-detected every tick.
 /// </summary>
 public sealed class WhistleHelper
 {
@@ -21,31 +24,52 @@ public sealed class WhistleHelper
     private readonly ITargetManager targetManager;
     private readonly ICondition condition;
     private readonly IClientState clientState;
+    private readonly IGameGui gameGui;
     private DateTime nextTry = DateTime.MinValue;
+    private int activeHorn = -1;
+    private bool hudDumped;
 
-    public WhistleHelper(Plugin plugin, IObjectTable objects, ITargetManager targetManager, ICondition condition, IClientState clientState)
+    public WhistleHelper(Plugin plugin, IObjectTable objects, ITargetManager targetManager, ICondition condition, IClientState clientState, IGameGui gameGui)
     {
         this.plugin = plugin;
         this.objects = objects;
         this.targetManager = targetManager;
         this.condition = condition;
         this.clientState = clientState;
+        this.gameGui = gameGui;
     }
 
     public unsafe void Tick()
     {
+        uint territory = this.clientState.TerritoryType;
+        if (territory is < 1339 or > 1343)
+        {
+            this.activeHorn = -1;
+            this.hudDumped = false;
+            return;
+        }
+
+        if (!this.condition[ConditionFlag.InCombat])
+        {
+            this.activeHorn = -1;
+            return;
+        }
+
         if (!this.plugin.Config.WhistlePlan)
         {
             return;
         }
 
-        uint territory = this.clientState.TerritoryType;
-        if (territory is < 1339 or > 1343)
+        // Latch whichever horn is inside its recast window; horns only recast in ~2s so keep the value afterwards.
+        this.DetectHorn();
+
+        if (!this.hudDumped)
         {
-            return;
+            this.DumpHud();
+            this.hudDumped = true;
         }
 
-        if (!this.condition[ConditionFlag.InCombat] || DateTime.UtcNow < this.nextTry)
+        if (DateTime.UtcNow < this.nextTry)
         {
             return;
         }
@@ -61,17 +85,11 @@ public sealed class WhistleHelper
             return;
         }
 
-        double hp = (double)target.CurrentHp / target.MaxHp;
+        this.nextTry = DateTime.UtcNow.AddMilliseconds(150);
 
-        int slot = this.ActiveHornSlot();
-        if (slot < 0)
-        {
-            return;
-        }
-
-        this.nextTry = DateTime.UtcNow.AddMilliseconds(250);
-
-        int threshold = this.plugin.Config.WhistleThresholds.Count > slot
+        double hpPercent = (double)target.CurrentHp / target.MaxHp * 100.0;
+        int slot = this.activeHorn;
+        int threshold = slot >= 0 && this.plugin.Config.WhistleThresholds.Count > slot
             ? this.plugin.Config.WhistleThresholds[slot]
             : 20;
 
@@ -84,7 +102,7 @@ public sealed class WhistleHelper
         bool wantBorrow = slot == 2 && this.plugin.Config.WhistleAutoBorrow;
         if (wantBorrow)
         {
-            if (hp * 100 > threshold)
+            if (hpPercent > threshold)
             {
                 return;
             }
@@ -92,13 +110,13 @@ public sealed class WhistleHelper
             if (actionManager->GetActionStatus(ActionType.Action, Borrow) == 0 &&
                 actionManager->UseAction(ActionType.Action, Borrow, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
             {
-                this.plugin.CpLog.Info($"whistle: horn 3 borrow at target {hp:P0}");
+                this.plugin.CpLog.Info($"whistle: horn 3 borrow at target {hpPercent:F0}%");
             }
 
             return;
         }
 
-        if (hp * 100 > threshold)
+        if (hpPercent > threshold)
         {
             return;
         }
@@ -106,37 +124,64 @@ public sealed class WhistleHelper
         if (actionManager->GetActionStatus(ActionType.Action, TemperedRelease) == 0 &&
             actionManager->UseAction(ActionType.Action, TemperedRelease, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
         {
-            this.plugin.CpLog.Info($"whistle: horn {slot + 1} tempered release at target {hp:P0} (threshold {threshold}%)");
+            this.plugin.CpLog.Info($"whistle: horn {(slot < 0 ? 0 : slot + 1)} tempered release at target {hpPercent:F0}% (threshold {threshold}%)");
         }
     }
 
-    /// <summary>The active horn slot (0-2), or -1 when no horn is running.</summary>
-    private unsafe int ActiveHornSlot()
+    private unsafe void DetectHorn()
     {
         var actionManager = ActionManager.Instance();
         if (actionManager == null)
         {
-            return -1;
+            return;
         }
 
-        int best = -1;
-        float bestElapsed = float.MaxValue;
         for (int i = 0; i < Horns.Length; i++)
         {
             float total = actionManager->GetRecastTime(ActionType.Action, Horns[i]);
-            if (total <= 0.5f)
+            if (total <= 0.1f)
             {
                 continue;
             }
 
             float elapsed = actionManager->GetRecastTimeElapsed(ActionType.Action, Horns[i]);
-            if (elapsed < total && elapsed < bestElapsed)
+            if (elapsed < total - 0.05f && elapsed < 2.5f)
             {
-                bestElapsed = elapsed;
-                best = i;
+                if (this.activeHorn != i)
+                {
+                    this.activeHorn = i;
+                    this.plugin.CpLog.Info($"whistle: horn slot {i + 1} active");
+                }
+
+                return;
             }
         }
+    }
 
-        return best;
+    /// <summary>Dump the crucible HUD values once per board so item slots can be mapped in the next iteration.</summary>
+    private unsafe void DumpHud()
+    {
+        var hud = this.gameGui.GetAddonByName<AtkUnitBase>("XBMContentsMainHUD");
+        if (hud == null || !hud->IsReady)
+        {
+            return;
+        }
+
+        try
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            int count = hud->AtkValuesCount;
+            for (int i = 0; i < count && i < 200; i++)
+            {
+                var value = hud->AtkValues[i];
+                parts.Add($"{i}:{value.Type}={value.Int}");
+            }
+
+            this.plugin.CpLog.Info("hud values(" + hud->AtkValuesCount + "): " + string.Join(" ", parts));
+        }
+        catch (Exception)
+        {
+            // diagnostics only
+        }
     }
 }

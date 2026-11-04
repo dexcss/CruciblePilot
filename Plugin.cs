@@ -77,7 +77,7 @@ public sealed class Plugin : IDalamudPlugin
         }
         this.horns = new HornAutopilot(this, log, gameGui, clientState);
         this.degree = new DegreeHelper(this, gameGui, clientState);
-        this.whistle = new WhistleHelper(this, objects, targetManager, condition, clientState);
+        this.whistle = new WhistleHelper(this, objects, targetManager, condition, clientState, gameGui);
         this.ui = new Ui(this);
 
         this.commands.AddHandler(CommandName, new CommandInfo(this.OnCommand)
