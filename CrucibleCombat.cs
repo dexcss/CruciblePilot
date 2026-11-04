@@ -390,7 +390,7 @@ public sealed class CrucibleCombat
         foreach (uint potion in FightPotions)
         {
             var entry = entries.FirstOrDefault(e => e.ItemId == potion && e.Available);
-            if (entry.ItemId == potion && this.items.Use((uint)entry.Slot))
+            if (entry.ItemId == potion && this.items.Use(entry.InventorySlot))
             {
                 this.lastPotionAt = DateTime.UtcNow;
                 this.plugin.CpLog.Info($"combat: used potion #{potion} from slot {entry.Slot} at {hp:F0}% hp");
@@ -420,7 +420,7 @@ public sealed class CrucibleCombat
     {
         foreach (var obj in this.objects)
         {
-            if (obj is IBattleNpc npc && npc.OwnerId == player.GameObjectId && npc.CurrentHp > 0)
+            if (obj is IBattleNpc npc && npc.OwnerId == player.EntityId && npc.EntityId != player.EntityId && npc.ObjectKind == ObjectKind.BattleNpc && npc.CurrentHp > 0)
             {
                 return npc;
             }

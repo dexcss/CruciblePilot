@@ -9,7 +9,8 @@ namespace CruciblePilot;
 
 /// <summary>
 /// Uses crucible consumables (potions/heals) through the game's own item-use call, and reads the crucible HUD to
-/// know which items sit in which slot (the HUD has ten five-value item groups starting at index 11).
+/// know which items sit in which slot. The HUD has ten five-value item groups starting at index 11:
+/// icon, item id, name, available, inventory slot.
 /// </summary>
 public sealed unsafe class CrucibleItems : IDisposable
 {
@@ -43,7 +44,7 @@ public sealed unsafe class CrucibleItems : IDisposable
 
     public void Dispose() => this.hook?.Dispose();
 
-    public bool Use(uint slot, int beastId = 0)
+    public bool Use(uint inventorySlot, int beastId = 0)
     {
         if (this.hook == null)
         {
@@ -57,17 +58,17 @@ public sealed unsafe class CrucibleItems : IDisposable
             return false;
         }
 
-        this.hook.Original(director, slot, beastId);
+        this.hook.Original(director, inventorySlot, beastId);
         return true;
     }
 
     private void UseItemDetour(InstanceContentDirector* director, uint slot, int beastId)
         => this.hook!.Original(director, slot, beastId);
 
-    /// <summary>Returns (slot, itemId, available) for every item shown in the crucible HUD.</summary>
-    public System.Collections.Generic.List<(int Slot, uint ItemId, bool Available)> ReadItems()
+    /// <summary>Returns (displaySlot, inventorySlot, itemId, available) for every item shown in the crucible HUD.</summary>
+    public System.Collections.Generic.List<(int Slot, uint InventorySlot, uint ItemId, bool Available)> ReadItems()
     {
-        var result = new System.Collections.Generic.List<(int, uint, bool)>();
+        var result = new System.Collections.Generic.List<(int, uint, uint, bool)>();
         var hud = this.gameGui.GetAddonByName<AtkUnitBase>("XBMContentsMainHUD");
         if (hud == null || !hud->IsReady)
         {
@@ -80,16 +81,19 @@ public sealed unsafe class CrucibleItems : IDisposable
             int baseIndex = FirstItemValue + slot * ItemGroupStride;
             int idIndex = baseIndex + 1;
             int availableIndex = baseIndex + 3;
-            if (availableIndex >= count)
+            int inventoryIndex = baseIndex + 4;
+            if (inventoryIndex >= count)
             {
                 break;
             }
 
             var idValue = hud->AtkValues[idIndex];
             var availableValue = hud->AtkValues[availableIndex];
+            var inventoryValue = hud->AtkValues[inventoryIndex];
             uint itemId = (uint)idValue.Int;
             bool available = availableValue.Byte != 0;
-            result.Add((slot, itemId, available));
+            uint inventorySlot = (uint)Math.Max(0, inventoryValue.Int);
+            result.Add((slot, inventorySlot, itemId, available));
         }
 
         return result;

@@ -108,6 +108,11 @@ public sealed class WhistleHelper
             return;
         }
 
+        if (!HasOneWithNature(player))
+        {
+            return;
+        }
+
         bool wantBorrow = slot == 2 && this.plugin.Config.WhistleAutoBorrow;
         if (wantBorrow)
         {
@@ -135,6 +140,20 @@ public sealed class WhistleHelper
         {
             this.plugin.CpLog.Info($"whistle: horn {(slot < 0 ? 0 : slot + 1)} tempered release at target {hpPercent:F0}% (threshold {threshold}%)");
         }
+    }
+
+    private static bool HasOneWithNature(Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter player)
+    {
+        const uint OneWithNature = 4601;
+        foreach (var status in player.StatusList)
+        {
+            if (status.StatusId == OneWithNature)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private unsafe void DetectHorn()
