@@ -60,6 +60,31 @@ public sealed class XszyysBridge : IDisposable
     }
 
     /// <summary>Resolves Dalamud / FFXIVClientStructs / ECommons for the loaded ACR assemblies.</summary>
+    private readonly HashSet<string> logged = new();
+
+    private void LogOnce(string key, string message)
+    {
+        if (this.logged.Add(key))
+        {
+            this.cpLog.Info(message);
+        }
+    }
+
+    private static string Describe(Exception ex)
+    {
+        var text = ex.GetType().Name + ": " + ex.Message;
+        var inner = ex.InnerException;
+        int depth = 0;
+        while (inner != null && depth < 3)
+        {
+            text += " <- " + inner.GetType().Name + ": " + inner.Message;
+            inner = inner.InnerException;
+            depth++;
+        }
+
+        return text;
+    }
+
     private static Assembly? ResolveFromKnownPlaces(object? sender, ResolveEventArgs args)
     {
         string simple = new AssemblyName(args.Name).Name ?? string.Empty;
@@ -82,6 +107,8 @@ public sealed class XszyysBridge : IDisposable
             Path.Combine(appData, "XIVLauncher", "addon", "Hooks"),
             Path.Combine(appData, "XIVLauncher", "installedPlugins", "PromeRotation"),
             Path.Combine(appData, "XIVLauncher", "pluginConfigs", "PromeRotation", "ACR", "XSZYYS"),
+            Path.Combine(appData, "XIVLauncher", "installedPlugins"),
+            Path.Combine(appData, "XIVLauncher", "devPlugins"),
         };
 
         foreach (string root in roots)
@@ -252,7 +279,7 @@ public sealed class XszyysBridge : IDisposable
             }
             catch (Exception ex)
             {
-                this.cpLog.Info($"bridge: {instance.GetType().Name}.Check threw {ex.InnerException?.Message ?? ex.Message}");
+                this.LogOnce("check:" + instance.GetType().Name, $"bridge: {instance.GetType().Name}.Check threw {Describe(ex)}");
                 continue;
             }
 
@@ -268,7 +295,7 @@ public sealed class XszyysBridge : IDisposable
             }
             catch (Exception ex)
             {
-                this.cpLog.Info($"bridge: {instance.GetType().Name}.GetAction threw {ex.InnerException?.Message ?? ex.Message}");
+                this.LogOnce("action:" + instance.GetType().Name, $"bridge: {instance.GetType().Name}.GetAction threw {Describe(ex)}");
                 continue;
             }
 
@@ -315,12 +342,51 @@ public sealed class XszyysBridge : IDisposable
             {
                 return value;
             }
+
+            var field = instance.GetType().GetField(name);
+            if (field?.GetValue(instance) is bool fieldValue)
+            {
+                return fieldValue;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ReadBoolUnused(object instance, params string[] names)
+    {
+        foreach (string name in names)
+        {
+            var property = instance.GetType().GetProperty(name);
+            if (property?.GetValue(instance) is bool value)
+            {
+                return value;
+            }
         }
 
         return false;
     }
 
     private static uint ReadUInt(object instance, params string[] names)
+    {
+        foreach (string name in names)
+        {
+            object? value = instance.GetType().GetProperty(name)?.GetValue(instance) ?? instance.GetType().GetField(name)?.GetValue(instance);
+            if (value is uint u)
+            {
+                return u;
+            }
+
+            if (value != null && uint.TryParse(value.ToString(), out uint parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return 0;
+    }
+
+    private static uint ReadUIntUnused(object instance, params string[] names)
     {
         foreach (string name in names)
         {
@@ -341,6 +407,20 @@ public sealed class XszyysBridge : IDisposable
     }
 
     private static int ReadInt(object instance, params string[] names)
+    {
+        foreach (string name in names)
+        {
+            object? value = instance.GetType().GetProperty(name)?.GetValue(instance) ?? instance.GetType().GetField(name)?.GetValue(instance);
+            if (value != null && int.TryParse(value.ToString(), out int parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return 0;
+    }
+
+    private static int ReadIntUnused(object instance, params string[] names)
     {
         foreach (string name in names)
         {
