@@ -68,23 +68,26 @@ public sealed class FoodHelper
         unsafe
         {
             var inventory = InventoryManager.Instance();
-            int count = inventory == null ? 0 : inventory->GetInventoryItemCount(itemId, false, true, true, 0);
-            if (count <= 0)
+            int normal = inventory == null ? 0 : inventory->GetInventoryItemCount(itemId, false);
+            int hq = inventory == null ? 0 : inventory->GetInventoryItemCount(itemId, true);
+            if (normal <= 0 && hq <= 0)
             {
-                this.plugin.CpLog.Warn($"food: no {config.FoodItemName} in inventory ({itemId})");
+                this.plugin.CpLog.Warn($"food: no {config.FoodItemName} in inventory ({itemId}, nq {normal}, hq {hq})");
                 this.plugin.Chat($"[CruciblePilot] no {config.FoodItemName} in your bags");
                 return;
             }
 
+            // HQ food gives the better buff; the game wants the HQ item id (base + 1,000,000) for it.
+            uint useId = hq > 0 ? itemId + 1_000_000 : itemId;
             bool used = ActionManager.Instance()->UseAction(
                 ActionType.Item,
-                itemId,
+                useId,
                 ItemUseParam,
                 0xFFFF,
                 ActionManager.UseActionMode.None,
                 0,
                 null);
-            this.plugin.CpLog.Info($"food: UseAction(Item, {itemId} \"{config.FoodItemName}\") = {used}, count {count}");
+            this.plugin.CpLog.Info($"food: UseAction(Item, {useId} \"{config.FoodItemName}\", nq {normal} hq {hq}) = {used}");
         }
     }
 
