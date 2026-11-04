@@ -64,6 +64,7 @@ public sealed class Plugin : IDalamudPlugin
         this.pluginInterface.UiBuilder.Draw += this.ui.Draw;
         this.log.Information("[CP] CruciblePilot loaded");
         this.cpLog.Info($"loaded v{typeof(Plugin).Assembly.GetName().Version} - log file {this.cpLog.CurrentFile}");
+        this.cpLog.Info($"config: board={this.Config.Board} degree={Configuration.DegreeName(this.Config.Degree)} autopilot={this.Config.Autopilot} autopick={this.Config.AutoPick} defaults={this.Config.UseDefaults} roster=[" + string.Join(",", this.Config.RosterFor(this.Config.Board)) + "]");
     }
 
     public static Plugin Instance { get; private set; } = null!;
@@ -318,6 +319,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        this.cpLog.Info("run: board=" + this.Config.Board + " degree=" + Configuration.DegreeName(this.Config.Degree) + " roster=[" + string.Join(",", roster) + "]");
         if (this.Config.SetAutoDutyTeam)
         {
             this.autoDutyTeam.Set(roster);

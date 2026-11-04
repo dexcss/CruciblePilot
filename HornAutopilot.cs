@@ -20,9 +20,11 @@ public sealed unsafe class HornAutopilot
     private DateTime nextAction = DateTime.MinValue;
     private DateTime lastConfirm = DateTime.MinValue;
     private DateTime nextYes = DateTime.MinValue;
+    private DateTime nextHeartbeat = DateTime.MinValue;
     private string lastWarn = string.Empty;
     private DateTime lastWarnAt = DateTime.MinValue;
     private string lastRosterSignature = string.Empty;
+    private string lastStageDumpSignature = string.Empty;
 
     public HornAutopilot(Plugin plugin, IPluginLog log, IGameGui gameGui, IClientState clientState)
     {
@@ -53,14 +55,18 @@ public sealed unsafe class HornAutopilot
         }
 
         var party = this.gameGui.GetAddonByName<AtkUnitBase>("XBMPetParty");
-        if (party == null || !party->IsReady || !party->IsVisible)
-        {
-            return;
-        }
-
         var stage = this.gameGui.GetAddonByName<AtkUnitBase>("XBMStageDetailList");
-        if (stage == null || !stage->IsReady || !stage->IsVisible)
+        bool partyOpen = party != null && party->IsReady && party->IsVisible;
+        bool stageOpen = stage != null && stage->IsReady && stage->IsVisible;
+        if (!partyOpen || !stageOpen)
         {
+            if (DateTime.UtcNow > this.nextHeartbeat)
+            {
+                this.nextHeartbeat = DateTime.UtcNow.AddSeconds(10);
+                var idleEnemies = this.plugin.Intel.CurrentEnemies();
+                this.plugin.CpLog.Info($"heartbeat board {board}: party={partyOpen} stage={stageOpen} enemies={idleEnemies.Count} [{string.Join(", ", idleEnemies)}]");
+            }
+
             return;
         }
 
@@ -90,11 +96,25 @@ public sealed unsafe class HornAutopilot
         }
 
         var roster = rows.Select(r => r.Number).ToHashSet();
+        var enemies = this.plugin.Intel.CurrentEnemies();
+        this.plugin.CpLog.Info("horn setup: enemies " + (enemies.Count == 0 ? "(none)" : "[" + string.Join(", ", enemies) + "]") +
+                               " roster [" + string.Join(", ", rows.Select(r => r.Number)) + "]");
+        this.DumpStage(stage, enemies);
+
         var target = this.ResolveTrio(board, roster);
         if (target.Count == 0)
         {
-            this.Warn($"no trio for board {board} - configure one in the window or check the roster");
-            return;
+            var fallback = rows.Where(r => r.MaxHp == 0 || r.Hp != 0).Select(r => r.Number).Distinct().Take(3).ToList();
+            if (fallback.Count == 3)
+            {
+                this.Warn("no enemies/default matched - starting with the first three roster beasts");
+                target = fallback;
+            }
+            else
+            {
+                this.Warn($"no trio for board {board} and no usable roster rows");
+                return;
+            }
         }
 
         var missing = target.Where(t => !roster.Contains(t)).ToList();
@@ -238,10 +258,54 @@ public sealed unsafe class HornAutopilot
         return picks;
     }
 
+    /// <summary>Log the stage-detail addon's values once per enemy set (helps map the encounter data).</summary>
+    private void DumpStage(AtkUnitBase* stage, IReadOnlyList<string> enemies)
+    {
+        string signature = string.Join("|", enemies);
+        if (signature == this.lastStageDumpSignature)
+        {
+            return;
+        }
+
+        this.lastStageDumpSignature = signature;
+        try
+        {
+            int count = Math.Min((int)stage->AtkValuesCount, 160);
+            var builder = new System.Text.StringBuilder();
+            for (int i = 0; i < count; i++)
+            {
+                var value = stage->AtkValues[i];
+                builder.Append(i).Append(':').Append(value.Type);
+                switch (value.Type)
+                {
+                    case AtkValueType.Int:
+                        builder.Append('=').Append(value.Int);
+                        break;
+                    case AtkValueType.UInt:
+                        builder.Append('=').Append(value.UInt);
+                        break;
+                    case AtkValueType.Bool:
+                        builder.Append('=').Append(value.Bool);
+                        break;
+                    case AtkValueType.Float:
+                        builder.Append('=').Append(value.Float.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
+                        break;
+                }
+
+                builder.Append(' ');
+            }
+
+            this.plugin.CpLog.Info($"stage values({count}): {builder}");
+        }
+        catch (Exception ex)
+        {
+            this.plugin.CpLog.Error(ex, "stage dump failed");
+        }
+    }
+
     public string Dump()
     {
-        var party = this.gameGui.GetAddonByName<AtkUnitBase>("XBMPetParty");
-        if (party == null || !party->IsReady)
+        var party = this.gameGui.GetAddonByName<AtkUnitBase>("XBMPetParty");        if (party == null || !party->IsReady)
         {
             return "XBMPetParty is not open";
         }

@@ -3,8 +3,8 @@
     "Author": "dexcss",
     "Name": "CruciblePilot",
     "InternalName": "CruciblePilot",
-    "AssemblyVersion": "0.3.2.0",
-    "TestingAssemblyVersion": "0.3.2.0",
+    "AssemblyVersion": "0.3.3.0",
+    "TestingAssemblyVersion": "0.3.3.0",
     "Description": "Drives FFXIV's Crucible of the Unbroken through AutoDuty: picks the difficulty (Standard through Third Degree), registers your team, reads the enemies standing in the arena, scores your familiars against their weaknesses and puts the best three on the battlehorns before every fight, then starts it. Includes a settings window, per-board fixed trios, and a run log for troubleshooting.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/dexcss/CruciblePilot",
@@ -24,6 +24,6 @@
       "Automation"
     ],
     "AcceptsFeedback": true,
-    "Changelog": "v0.3.2.0: first release. AutoDuty-driven Crucible runs; degree selection (Standard/First/Second/Third) pushed through AutoDuty's config overrides; battlehorn autopilot that assigns your trio and starts the fight; encounter-aware trio from the enemies in the arena using an embedded weakness table for all five boards and familiar damage/element profiles from the game sheets; per-board fixed trios; AutoDuty custom-team injection; run log under pluginConfigs/CruciblePilot/logs."
+    "Changelog": "v0.3.3.0: first release. AutoDuty-driven Crucible runs; degree selection (Standard/First/Second/Third) pushed through AutoDuty's config overrides; battlehorn autopilot that assigns your trio and starts the fight; encounter-aware trio from the enemies in the arena using an embedded weakness table for all five boards and familiar damage/element profiles from the game sheets; per-board fixed trios; AutoDuty custom-team injection; run log under pluginConfigs/CruciblePilot/logs."
   }
 ]
