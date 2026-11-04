@@ -21,6 +21,14 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Download Dalamud
+        shell: pwsh
+        run: |
+          $hooks = Join-Path $env:AppData 'XIVLauncher\addon\Hooks\dev'
+          New-Item -ItemType Directory -Force -Path $hooks | Out-Null
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
+          Expand-Archive -Force latest.zip $hooks
+
       - name: Restore
         run: dotnet restore CruciblePilot.csproj
 
