@@ -320,6 +320,13 @@ public sealed unsafe class HornAutopilot
     /// <summary>Resolve the trio for the encounter currently being set up (recomputed only when the encounter changes).</summary>
     private List<uint> ResolveTrio(int board, HashSet<uint> roster, IReadOnlyList<string> enemies, IReadOnlyCollection<string> weaknesses)
     {
+        // Community meta: the same three beasts every fight (the shared Pawprint perfect-run presets).
+        if (this.plugin.Config.MetaTrioMode)
+        {
+            var meta = this.plugin.Config.MetaTrio(board).Where(roster.Contains).ToList();
+            return meta.Count == 3 ? meta : new List<uint>();
+        }
+
         // Score runs bring exactly three beasts and keep them for every fight (Beast Squad III).
         if (this.plugin.Config.ScoreMode)
         {

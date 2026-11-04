@@ -158,6 +158,7 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     private readonly HashSet<uint> buffUsed = new();
+    private readonly Dictionary<uint, int> buffAttempts = new();
     private DateTime nextBuffTry = DateTime.MinValue;
     private uint buffTerritory;
 
@@ -177,6 +178,7 @@ public sealed class Plugin : IDalamudPlugin
         if (territory is < 1339 or > 1343)
         {
             this.buffUsed.Clear();
+            this.buffAttempts.Clear();
             this.buffTerritory = 0;
             return;
         }
@@ -185,6 +187,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             this.buffTerritory = territory;
             this.buffUsed.Clear();
+            this.buffAttempts.Clear();
             this.nextBuffTry = DateTime.MinValue;
         }
 
@@ -201,6 +204,15 @@ public sealed class Plugin : IDalamudPlugin
             {
                 continue;
             }
+
+            this.buffAttempts.TryGetValue(itemId, out int tries);
+            if (tries >= 3)
+            {
+                this.buffUsed.Add(itemId); // the item action path does not work for crucible items; stop retrying
+                continue;
+            }
+
+            this.buffAttempts[itemId] = tries + 1;
 
             // Crucible items live outside the normal inventory, so the count can read 0 even when held;
             // just try the item action and let the game refuse it when it is not there.
@@ -379,9 +391,11 @@ public sealed class Plugin : IDalamudPlugin
 
     public void StartRun()
     {
-        var roster = this.Config.ScoreMode
-            ? this.Config.ScoreTrio(this.Config.Board).Distinct().Where(n => n is >= 1 and <= 50).ToList()
-            : this.Config.RosterFor(this.Config.Board).Distinct().Where(n => n is >= 1 and <= 50).ToList();
+        var roster = this.Config.MetaTrioMode
+            ? this.Config.MetaTrio(this.Config.Board).Distinct().Where(n => n is >= 1 and <= 50).ToList()
+            : this.Config.ScoreMode
+                ? this.Config.ScoreTrio(this.Config.Board).Distinct().Where(n => n is >= 1 and <= 50).ToList()
+                : this.Config.RosterFor(this.Config.Board).Distinct().Where(n => n is >= 1 and <= 50).ToList();
         if (roster.Count < 3)
         {
             this.Chat(this.Config.ScoreMode

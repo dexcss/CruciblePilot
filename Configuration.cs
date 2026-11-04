@@ -22,6 +22,25 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>0 = Standard, 1 = First, 2 = Second, 3 = Third.</summary>
     public int Degree { get; set; } = 0;
 
+    /// <summary>
+    /// Community meta: keep exactly three beasts for the whole board, as the shared Pawprint "perfect run" presets do
+    /// (Mantis 16 + Wespe 10 + Cu Sith 1). No per-fight swapping.
+    /// </summary>
+    public bool MetaTrioMode { get; set; } = true;
+
+    /// <summary>Per-board meta trios taken from those presets.</summary>
+    public Dictionary<int, List<uint>> MetaTrios { get; set; } = new()
+    {
+        [1] = new() { 16, 10, 1 },
+        [2] = new() { 16, 10, 1 },
+        [3] = new() { 16, 10, 1 },
+        [4] = new() { 16, 10, 32 },
+        [5] = new() { 16, 1, 10 },
+    };
+
+    public List<uint> MetaTrio(int board)
+        => this.MetaTrios.TryGetValue(board, out var list) ? list : new List<uint>();
+
     /// <summary>Clear mode brings a full roster and swaps per fight; score mode brings exactly three beasts for Beast Squad III and the no-shop/no-rest bonuses.</summary>
     /// <summary>Drink defensive Crucible consumables (reraisser/sand/kits) between fights when held.</summary>
     public bool UseCrucibleBuffs { get; set; } = true;

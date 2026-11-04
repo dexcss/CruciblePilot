@@ -90,6 +90,18 @@ public sealed class Ui
             this.plugin.SaveConfig();
         }
 
+        bool metaMode = config.MetaTrioMode;
+        if (ImGui.Checkbox("Community meta trio (Mantis/Wespe/Cu Sith, fixed all board)", ref metaMode))
+        {
+            config.MetaTrioMode = metaMode;
+            this.plugin.SaveConfig();
+        }
+
+        if (config.MetaTrioMode)
+        {
+            ImGui.TextUnformatted("Meta trio for this board: " + string.Join(", ", config.MetaTrio(config.Board)));
+        }
+
         bool scoreMode = config.ScoreMode;
         if (ImGui.Checkbox("Score mode (3 beasts, no shop/items/rest - for Legendary/leaderboard)", ref scoreMode))
         {
