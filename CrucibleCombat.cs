@@ -560,7 +560,8 @@ public sealed class CrucibleCombat
             string gaugeText = BeastGauge.TryRead(out var g)
                 ? $"tp={g.TpGauge} petTp={g.PetTpGauge} soul={g.SoulStacks} power={g.BeastPower} whistle={g.WhistleIndex} heart={g.HeartStacks} horn={g.ActiveBattlehorn}"
                 : "gauge?";
-            this.plugin.CpLog.Info($"combat diag: player={player.GameObjectId:X} pets=[" + string.Join(", ", pets) + "] " + gaugeText);
+            int hpPercent = player.MaxHp == 0 ? 0 : (int)(player.CurrentHp * 100 / player.MaxHp);
+            this.plugin.CpLog.Info($"combat diag: hp={hpPercent}% player={player.GameObjectId:X} pets=[" + string.Join(", ", pets) + "] " + gaugeText);
         }
         catch (Exception)
         {

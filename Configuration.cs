@@ -44,7 +44,7 @@ public sealed class Configuration : IPluginConfiguration
     public bool CombatPotions { get; set; } = true;
 
     /// <summary>Drink a crucible potion at or below this HP percentage.</summary>
-    public int CombatPotionHpPercent { get; set; } = 60;
+    public int CombatPotionHpPercent { get; set; } = 70;
 
     /// <summary>Press Tempered Release when the target is below the active horn's finisher threshold.</summary>
     public bool WhistlePlan { get; set; } = true;
