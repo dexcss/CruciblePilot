@@ -347,6 +347,8 @@ public sealed class Plugin : IDalamudPlugin
         };
 
         // Wait for the meal buff before entering: eating has to happen out of the duty and takes a moment to apply.
+        this.cpLog.Info("food: Well Fed " + (this.food.HasFood() ? "active" : "missing"));
+
         if (this.Config.EatFood && !this.food.HasFood())
         {
             this.food.TryEat(this.Config);

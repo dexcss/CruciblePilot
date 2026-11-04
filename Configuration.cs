@@ -33,7 +33,7 @@ public sealed class Configuration : IPluginConfiguration
 
     public static Dictionary<int, List<uint>> DefaultRosters() => new()
     {
-        [1] = new() { 1, 5, 11, 13, 23, 29, 31, 33, 2, 40 },
+        [1] = new() { 1, 5, 11, 13, 23, 25, 29, 31, 33, 40 },
         [2] = new() { 2, 5, 13, 16, 23, 29, 31, 33, 34, 38, 40, 41 },
         [3] = new() { 1, 2, 10, 13, 15, 16, 23, 26, 28, 29, 31, 34, 47, 50 },
         [4] = new() { 1, 10, 15, 16, 23, 26, 28, 29, 31, 34, 44, 50 },

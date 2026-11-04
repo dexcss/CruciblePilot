@@ -137,7 +137,7 @@ public sealed class EnemyIntel
         {
             ("Bone Knight/Bishop - blunt", new[] { "bone knight", "bone bishop" }, new uint[] { 5, 31, 1 }),
             ("Arch Demon/Piscodemon - lightning/slashing", new[] { "arch demon", "piscodemon" }, new uint[] { 33, 13, 1 }),
-            ("Banemite/Mitelings - ice", new[] { "banemite", "mitelings" }, new uint[] { 31, 1, 13 }),
+            ("Banemite/Mitelings - ice", new[] { "banemite", "mitelings" }, new uint[] { 31, 13, 25 }),
             ("Ogre/Wisps - wind/water", new[] { "ogre", "wisp" }, new uint[] { 31, 5, 1 }),
             ("Pas de Seul - piercing, fire adds", new[] { "pas de seul", "succubus" }, new uint[] { 1, 29, 11 }),
         },
