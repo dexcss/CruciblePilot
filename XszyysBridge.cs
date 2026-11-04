@@ -107,31 +107,75 @@ public sealed class XszyysBridge : IDisposable
             Path.Combine(appData, "XIVLauncher", "addon", "Hooks"),
             Path.Combine(appData, "XIVLauncher", "installedPlugins", "PromeRotation"),
             Path.Combine(appData, "XIVLauncher", "pluginConfigs", "PromeRotation", "ACR", "XSZYYS"),
+            Path.Combine(appData, "XIVLauncher", "installedPlugins", "RotationSolver"),
+            Path.Combine(appData, "XIVLauncher", "installedPlugins", "BossModReborn"),
             Path.Combine(appData, "XIVLauncher", "installedPlugins"),
             Path.Combine(appData, "XIVLauncher", "devPlugins"),
         };
 
-        foreach (string root in roots)
+        foreach (string file in SafeFind(roots, simple + ".dll"))
         {
-            if (!Directory.Exists(root))
+            try
             {
-                continue;
+                return Assembly.LoadFrom(file);
             }
-
-            foreach (string file in Directory.GetFiles(root, simple + ".dll", SearchOption.AllDirectories))
+            catch
             {
-                try
-                {
-                    return Assembly.LoadFrom(file);
-                }
-                catch
-                {
-                    // try next candidate
-                }
+                // try next candidate
             }
         }
 
         return null;
+    }
+
+    /// <summary>Depth-first search that ignores unreadable folders instead of aborting the whole walk.</summary>
+    private static IEnumerable<string> SafeFind(IEnumerable<string> roots, string fileName)
+    {
+        var pending = new Stack<string>(roots.Where(Directory.Exists));
+        while (pending.Count > 0)
+        {
+            string dir = pending.Pop();
+
+            IEnumerable<string> files;
+            try
+            {
+                files = Directory.EnumerateFiles(dir);
+            }
+            catch
+            {
+                continue;
+            }
+
+            string? match = null;
+            try
+            {
+                match = files.FirstOrDefault(f => string.Equals(Path.GetFileName(f), fileName, StringComparison.OrdinalIgnoreCase));
+            }
+            catch
+            {
+                // enumeration failure, keep walking
+            }
+
+            if (match != null)
+            {
+                yield return match;
+            }
+
+            IEnumerable<string> subs;
+            try
+            {
+                subs = Directory.EnumerateDirectories(dir);
+            }
+            catch
+            {
+                continue;
+            }
+
+            foreach (string sub in subs)
+            {
+                pending.Push(sub);
+            }
+        }
     }
 
     private static string? FindRotationSolverAssembly()
