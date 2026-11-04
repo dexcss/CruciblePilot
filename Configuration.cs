@@ -22,6 +22,22 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>0 = Standard, 1 = First, 2 = Second, 3 = Third.</summary>
     public int Degree { get; set; } = 0;
 
+    /// <summary>Clear mode brings a full roster and swaps per fight; score mode brings exactly three beasts for Beast Squad III and the no-shop/no-rest bonuses.</summary>
+    public bool ScoreMode { get; set; }
+
+    /// <summary>The three beasts used in score mode, per board (they must clear the whole board alone).</summary>
+    public Dictionary<int, List<uint>> ScoreTrios { get; set; } = new()
+    {
+        [1] = new() { 50, 26, 1 },
+        [2] = new() { 50, 26, 11 },
+        [3] = new() { 50, 26, 21 },
+        [4] = new() { 50, 26, 16 },
+        [5] = new() { 50, 26, 16 },
+    };
+
+    public List<uint> ScoreTrio(int board)
+        => this.ScoreTrios.TryGetValue(board, out var list) ? list : new List<uint>();
+
     /// <summary>Desired battlehorn trio per board (familiar numbers); used when AutoPick is off or no enemies are read.</summary>
     public Dictionary<int, List<uint>> Trios { get; set; } = new();
 

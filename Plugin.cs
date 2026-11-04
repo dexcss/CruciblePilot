@@ -312,10 +312,14 @@ public sealed class Plugin : IDalamudPlugin
 
     public void StartRun()
     {
-        var roster = this.Config.RosterFor(this.Config.Board).Distinct().Where(n => n is >= 1 and <= 50).ToList();
+        var roster = this.Config.ScoreMode
+            ? this.Config.ScoreTrio(this.Config.Board).Distinct().Where(n => n is >= 1 and <= 50).ToList()
+            : this.Config.RosterFor(this.Config.Board).Distinct().Where(n => n is >= 1 and <= 50).ToList();
         if (roster.Count < 3)
         {
-            this.Chat("[CruciblePilot] set a roster of at least three familiars (window: Roster field)");
+            this.Chat(this.Config.ScoreMode
+                ? "[CruciblePilot] score mode needs three beasts (window: score trio)"
+                : "[CruciblePilot] set a roster of at least three familiars (window: Roster field)");
             return;
         }
 
@@ -355,6 +359,18 @@ public sealed class Plugin : IDalamudPlugin
             ["DutyConfig.AutoManageRotationPluginState"] = "true",
             ["DutyConfig.RotationPlugin"] = "RotationSolverReborn",
         };
+
+        if (this.Config.ScoreMode)
+        {
+            // Score bonuses: 3 familiars (Beast Squad III), no shop purchases (Economic Ethos + Coin Clutcher),
+            // no crucible items (Economic Ethos), no campsite rest (Sleepless Survival), no beast gear (Nameday Attire).
+            overrides["Meta.Crucible.Shop"] = "false";
+            overrides["Meta.Crucible.Items"] = "false";
+            overrides["Meta.Crucible.Rest"] = "false";
+            overrides["Meta.Crucible.Loot"] = "false";
+            overrides["Meta.Crucible.Treasure"] = "false";
+            this.cpLog.Info("score mode: 3-beast team, shop/items/rest/loot/treasure disabled for bonus stacking");
+        }
 
         // Wait for the meal buff before entering: eating has to happen out of the duty and takes a moment to apply.
         this.cpLog.Info("food: Well Fed " + (this.food.HasFood() ? "active" : "missing"));

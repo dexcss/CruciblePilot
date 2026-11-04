@@ -320,6 +320,13 @@ public sealed unsafe class HornAutopilot
     /// <summary>Resolve the trio for the encounter currently being set up (recomputed only when the encounter changes).</summary>
     private List<uint> ResolveTrio(int board, HashSet<uint> roster, IReadOnlyList<string> enemies, IReadOnlyCollection<string> weaknesses)
     {
+        // Score runs bring exactly three beasts and keep them for every fight (Beast Squad III).
+        if (this.plugin.Config.ScoreMode)
+        {
+            var scoreTrio = this.plugin.Config.ScoreTrio(board).Where(roster.Contains).ToList();
+            return scoreTrio.Count == 3 ? scoreTrio : new List<uint>();
+        }
+
         if (!this.plugin.Config.AutoPick)
         {
             var manual = this.plugin.Config.Trio(board);

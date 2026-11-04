@@ -90,6 +90,42 @@ public sealed class Ui
             this.plugin.SaveConfig();
         }
 
+        bool scoreMode = config.ScoreMode;
+        if (ImGui.Checkbox("Score mode (3 beasts, no shop/items/rest - for Legendary/leaderboard)", ref scoreMode))
+        {
+            config.ScoreMode = scoreMode;
+            this.plugin.SaveConfig();
+        }
+
+        if (config.ScoreMode)
+        {
+            ImGui.TextUnformatted("Score trio for this board (one beast per horn; must clear the whole board)");
+            var scoreTrio = config.ScoreTrio(config.Board);
+            var scoreSelected = new uint[3];
+            for (int i = 0; i < 3; i++)
+            {
+                scoreSelected[i] = i < scoreTrio.Count ? scoreTrio[i] : 0;
+            }
+
+            bool scoreChanged = false;
+            for (int i = 0; i < 3; i++)
+            {
+                int slot = scoreSelected[i] == 0 ? 0 : (int)scoreSelected[i] - 1;
+                ImGui.SetNextItemWidth(300);
+                if (ImGui.Combo($"Score horn {i + 1}", ref slot, BeastItems))
+                {
+                    scoreSelected[i] = (uint)(slot + 1);
+                    scoreChanged = true;
+                }
+            }
+
+            if (scoreChanged)
+            {
+                config.ScoreTrios[config.Board] = scoreSelected.Where(x => x > 0).Distinct().ToList();
+                this.plugin.SaveConfig();
+            }
+        }
+
         ImGui.Separator();
         ImGui.TextUnformatted("Roster AutoDuty registers (numbers, comma separated; up to the board's cap)");
         if (this.lastBoard != config.Board) { this.lastBoard = config.Board; this.rosterText = Configuration.FormatRoster(config.RosterFor(config.Board)); }
