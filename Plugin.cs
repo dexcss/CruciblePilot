@@ -31,6 +31,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly HornAutopilot horns;
     private readonly DegreeHelper degree;
     private readonly WhistleHelper whistle;
+    private readonly CrucibleItems crucibleItems;
+    private readonly CrucibleCombat crucibleCombat;
     private readonly Ui ui;
     private readonly CpLog cpLog;
     private bool pushedOverrides;
@@ -49,7 +51,8 @@ public sealed class Plugin : IDalamudPlugin
         IObjectTable objects,
         IDataManager data,
         ICondition condition,
-        ITargetManager targetManager)
+        ITargetManager targetManager,
+        IGameInteropProvider interop)
     {
         Instance = this;
         this.pluginInterface = pluginInterface;
@@ -78,6 +81,8 @@ public sealed class Plugin : IDalamudPlugin
         this.horns = new HornAutopilot(this, log, gameGui, clientState);
         this.degree = new DegreeHelper(this, gameGui, clientState);
         this.whistle = new WhistleHelper(this, objects, targetManager, condition, clientState, gameGui);
+        this.crucibleItems = new CrucibleItems(interop, gameGui, log);
+        this.crucibleCombat = new CrucibleCombat(this, objects, targetManager, condition, clientState, crucibleItems);
         this.ui = new Ui(this);
 
         this.commands.AddHandler(CommandName, new CommandInfo(this.OnCommand)
@@ -121,6 +126,7 @@ public sealed class Plugin : IDalamudPlugin
             this.autoDuty.Pop();
         }
 
+        this.crucibleItems.Dispose();
         this.cpLog.Info("unloaded");
         this.cpLog.Dispose();
         this.log.Information("[CP] CruciblePilot unloaded");
@@ -160,6 +166,7 @@ public sealed class Plugin : IDalamudPlugin
         this.horns.Tick();
         this.degree.Tick();
         this.whistle.Tick();
+        this.crucibleCombat.Tick();
         this.TickPendingStart();
         this.TickCrucibleBuffs();
     }

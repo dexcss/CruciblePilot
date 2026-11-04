@@ -31,6 +31,18 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Force the Crucible Mode (degree) on the pre-battle window, for runs driven by another plugin (Pawprint).</summary>
     public bool ForceDegree { get; set; } = true;
 
+    /// <summary>Run our own Beastmaster Crucible rotation (replaces RSR inside the arena).</summary>
+    public bool EnableCombat { get; set; } = true;
+
+    /// <summary>Summon the battlehorns ourselves as part of the combat loop.</summary>
+    public bool CombatHorns { get; set; } = true;
+
+    /// <summary>Drink crucible healing potions from the arena HUD when low.</summary>
+    public bool CombatPotions { get; set; } = true;
+
+    /// <summary>Use a crucible potion at or below this HP percentage.</summary>
+    public int CombatPotionHpPercent { get; set; } = 60;
+
     /// <summary>
     /// XSZYYS-style whistle plan: press Tempered Release when the current target is below the active horn's
     /// finisher threshold (the values the shared whistle presets use).

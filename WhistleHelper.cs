@@ -65,8 +65,7 @@ public sealed class WhistleHelper
 
         if (!this.hudDumped)
         {
-            this.DumpHud();
-            this.hudDumped = true;
+            this.hudDumped = this.DumpHud();
         }
 
         if (DateTime.UtcNow < this.nextTry)
@@ -159,12 +158,12 @@ public sealed class WhistleHelper
     }
 
     /// <summary>Dump the crucible HUD values once per board so item slots can be mapped in the next iteration.</summary>
-    private unsafe void DumpHud()
+    private unsafe bool DumpHud()
     {
         var hud = this.gameGui.GetAddonByName<AtkUnitBase>("XBMContentsMainHUD");
         if (hud == null || !hud->IsReady)
         {
-            return;
+            return false;
         }
 
         try
@@ -178,10 +177,11 @@ public sealed class WhistleHelper
             }
 
             this.plugin.CpLog.Info("hud values(" + hud->AtkValuesCount + "): " + string.Join(" ", parts));
+            return true;
         }
         catch (Exception)
         {
-            // diagnostics only
+            return false;
         }
     }
 }

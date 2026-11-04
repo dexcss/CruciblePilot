@@ -115,6 +115,38 @@ public sealed class Ui
                 config.WhistleThresholds[1] + "%, horn3 " + config.WhistleThresholds[2] + "%");
         }
 
+        bool ownCombat = config.EnableCombat;
+        if (ImGui.Checkbox("Own Crucible combat loop (turn RSR off for BST)", ref ownCombat))
+        {
+            config.EnableCombat = ownCombat;
+            this.plugin.SaveConfig();
+        }
+
+        if (config.EnableCombat)
+        {
+            bool horns = config.CombatHorns;
+            if (ImGui.Checkbox("  summon battlehorns", ref horns))
+            {
+                config.CombatHorns = horns;
+                this.plugin.SaveConfig();
+            }
+
+            bool potions = config.CombatPotions;
+            if (ImGui.Checkbox("  drink crucible potions when low", ref potions))
+            {
+                config.CombatPotions = potions;
+                this.plugin.SaveConfig();
+            }
+
+            ImGui.SetNextItemWidth(120);
+            int potionHp = config.CombatPotionHpPercent;
+            if (ImGui.SliderInt("  potion HP %", ref potionHp, 20, 90))
+            {
+                config.CombatPotionHpPercent = potionHp;
+                this.plugin.SaveConfig();
+            }
+        }
+
         bool scoreMode = config.ScoreMode;
         if (ImGui.Checkbox("Score mode (3 beasts, no shop/items/rest - for Legendary/leaderboard)", ref scoreMode))
         {
