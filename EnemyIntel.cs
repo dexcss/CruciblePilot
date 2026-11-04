@@ -190,31 +190,19 @@ public sealed class EnemyIntel
     public List<uint> DefaultTrio(int board, IReadOnlyList<string> enemies, out string label)
     {
         label = string.Empty;
-        if (!Defaults.TryGetValue(board, out var entries) || enemies.Count == 0)
+        if (enemies.Count == 0)
         {
             return new List<uint>();
         }
 
-        string joined = string.Join(" ", enemies).ToLowerInvariant();
-        (string Label, string[] Patterns, uint[] Trio)? best = null;
-        int bestHits = 0;
-        foreach (var entry in entries)
-        {
-            int hits = entry.Patterns.Count(p => joined.Contains(p, StringComparison.Ordinal));
-            if (hits > bestHits)
-            {
-                bestHits = hits;
-                best = entry;
-            }
-        }
-
-        if (best == null)
+        var match = CrucibleData.Match(board, enemies);
+        if (match == null)
         {
             return new List<uint>();
         }
 
-        label = best.Value.Label;
-        return best.Value.Trio.ToList();
+        label = match.Value.Label;
+        return match.Value.Trio.ToList();
     }
 
 
@@ -288,7 +276,7 @@ public sealed class EnemyIntel
                 uint number = row.RowId;
                 string name = row.Pet.Value.Name.ExtractText();
                 string element = ElementName(row.Action.Value.Aspect);
-                string damageType = DamageTypeName(row.Pet.Value.AutoAction.Value);
+                string damageType = ParseDamageType(row.TrickDescription.ExtractText(), row.Action.Value);
                 this.profiles[number] = new BeastProfile(number, name, damageType, element);
             }
         }
@@ -416,17 +404,39 @@ public sealed class EnemyIntel
         4 => "earth",
         5 => "lightning",
         6 => "water",
-        7 => "holy",
-        8 => "dark",
         _ => string.Empty,
     };
 
-    private static string DamageTypeName(Lumina.Excel.Sheets.Experimental.Action action)
+    /// <summary>
+    /// The familiar's physical damage type comes from the Trick description ("Delivers a slashing physical
+    /// attack"), not from the action's attack type (which reads as magic for every pet skill).
+    /// </summary>
+    private static string ParseDamageType(string trickDescription, Lumina.Excel.Sheets.Experimental.Action action)
     {
+        string text = trickDescription.ToLowerInvariant();
+        if (text.Contains("slashing"))
+        {
+            return "slash";
+        }
+
+        if (text.Contains("piercing"))
+        {
+            return "pierce";
+        }
+
+        if (text.Contains("blunt"))
+        {
+            return "blunt";
+        }
+
+        if (text.Contains("magic"))
+        {
+            return "magic";
+        }
+
         try
         {
-            string name = action.AttackType.Value.Name.ExtractText().Trim();
-            return name.ToLowerInvariant() switch
+            return action.AttackType.Value.Name.ExtractText().Trim().ToLowerInvariant() switch
             {
                 "slashing" => "slash",
                 "piercing" => "pierce",
