@@ -82,7 +82,7 @@ public sealed unsafe class HornAutopilot
             return;
         }
 
-        string rosterSignature = string.Join(",", rows.Select(r => $"{r.Number}:{r.Selection}:{r.Hp}"));
+        string rosterSignature = string.Join(",", rows.Select(r => r.Number));
         if (rosterSignature != this.lastRosterSignature)
         {
             this.lastRosterSignature = rosterSignature;
@@ -181,6 +181,10 @@ public sealed unsafe class HornAutopilot
 
     public string LastPickReason { get; private set; } = string.Empty;
 
+    private string lastEnemySignature = string.Empty;
+    private List<uint> cachedPick = new();
+
+    /// <summary>Resolve the trio for the encounter currently being set up (recomputed only when the enemy set changes).</summary>
     private List<uint> ResolveTrio(int board, HashSet<uint> roster)
     {
         var fixedTrio = this.plugin.Config.Trio(board);
@@ -190,6 +194,13 @@ public sealed unsafe class HornAutopilot
         }
 
         var enemies = this.plugin.Intel.CurrentEnemies();
+        string signature = string.Join("|", enemies.OrderBy(e => e, StringComparer.OrdinalIgnoreCase));
+        if (signature == this.lastEnemySignature && this.cachedPick.Count == 3 && this.cachedPick.All(roster.Contains))
+        {
+            return this.cachedPick;
+        }
+
+        this.lastEnemySignature = signature;
         if (enemies.Count > 0)
         {
             this.LastEnemies = enemies;
@@ -197,18 +208,20 @@ public sealed unsafe class HornAutopilot
 
         if (enemies.Count == 0)
         {
+            this.LastPickReason = "no enemies in range yet";
             return fixedTrio;
         }
 
         var picks = this.plugin.Intel.PickTrio(roster.ToList(), out string reason);
         this.LastPickReason = reason;
-        this.plugin.CpLog.Info("enemies: " + string.Join(", ", enemies) + " -> pick " + string.Join(",", picks) + " (" + reason + ")");
+        this.plugin.CpLog.Info("encounter [" + string.Join(", ", enemies) + "] -> pick " + string.Join(",", picks) + " (" + reason + ")");
         if (picks.Count != 3 || picks.Any(p => !roster.Contains(p)))
         {
             this.log.Debug($"[CP] encounter picker fell back to the configured trio ({reason})");
             return fixedTrio;
         }
 
+        this.cachedPick = picks;
         return picks;
     }
 

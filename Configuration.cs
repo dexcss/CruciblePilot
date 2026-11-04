@@ -22,8 +22,11 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>0 = Standard, 1 = First, 2 = Second, 3 = Third.</summary>
     public int Degree { get; set; } = 0;
 
-    /// <summary>Desired battlehorn trio per board (familiar numbers).</summary>
+    /// <summary>Desired battlehorn trio per board (familiar numbers); used when AutoPick is off or no enemies are read.</summary>
     public Dictionary<int, List<uint>> Trios { get; set; } = new();
+
+    /// <summary>Familiar numbers AutoDuty registers as the team; the per-fight picker chooses three of these.</summary>
+    public List<uint> Roster { get; set; } = new() { 1, 2, 10, 13, 15, 16, 23, 25, 26, 28, 29, 31, 34, 40, 47 };
 
     /// <summary>Try to rewrite AutoDuty's CustomTeam via reflection before starting a run.</summary>
     public bool SetAutoDutyTeam { get; set; } = true;
@@ -36,6 +39,22 @@ public sealed class Configuration : IPluginConfiguration
 
     public List<uint> Trio(int board)
         => this.Trios.TryGetValue(board, out var trio) ? trio : new List<uint>();
+
+    public static string FormatRoster(IEnumerable<uint> roster) => string.Join(", ", roster);
+
+    public static List<uint> ParseRoster(string text)
+    {
+        var result = new List<uint>();
+        foreach (var part in text.Split(new[] { ',', ' ', ';', '|' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (uint.TryParse(part, out uint number) && number >= 1 && number <= 50 && !result.Contains(number))
+            {
+                result.Add(number);
+            }
+        }
+
+        return result;
+    }
 
     public static string DegreeName(int degree) => degree switch
     {

@@ -34,6 +34,7 @@ public sealed class Ui
         .ToArray();
 
     private readonly Plugin plugin;
+    private string? rosterText;
 
     public Ui(Plugin plugin) => this.plugin = plugin;
 
@@ -88,7 +89,21 @@ public sealed class Ui
         }
 
         ImGui.Separator();
-        ImGui.TextUnformatted("Battlehorn trio for this board");
+        ImGui.TextUnformatted("Roster AutoDuty registers (numbers, comma separated; up to the board's cap)");
+        this.rosterText ??= Configuration.FormatRoster(config.Roster);
+        ImGui.SetNextItemWidth(390);
+        if (ImGui.InputText("Roster", ref this.rosterText, 512))
+        {
+            var parsed = Configuration.ParseRoster(this.rosterText);
+            if (parsed.Count > 0)
+            {
+                config.Roster = parsed;
+                this.plugin.SaveConfig();
+            }
+        }
+
+        ImGui.Separator();
+        ImGui.TextUnformatted("Fallback trio for this board (used when the picker has no enemies)");
 
         var trio = config.Trio(config.Board);
         var selected = new uint[3];
@@ -132,7 +147,7 @@ public sealed class Ui
         }
 
         bool setTeam = config.SetAutoDutyTeam;
-        if (ImGui.Checkbox("Push trio into AutoDuty's custom team", ref setTeam))
+        if (ImGui.Checkbox("Push roster into AutoDuty's custom team", ref setTeam))
         {
             config.SetAutoDutyTeam = setTeam;
             this.plugin.SaveConfig();

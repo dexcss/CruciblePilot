@@ -292,10 +292,10 @@ public sealed class Plugin : IDalamudPlugin
 
     public void StartRun()
     {
-        var trio = this.Config.Trio(this.Config.Board);
-        if (trio.Count != 3)
+        var roster = this.Config.Roster.Distinct().Where(n => n is >= 1 and <= 50).ToList();
+        if (roster.Count < 3)
         {
-            this.Chat($"[CruciblePilot] board {this.Config.Board} needs three familiars on the horns");
+            this.Chat("[CruciblePilot] set a roster of at least three familiars (window: Roster field)");
             return;
         }
 
@@ -320,7 +320,7 @@ public sealed class Plugin : IDalamudPlugin
 
         if (this.Config.SetAutoDutyTeam)
         {
-            this.autoDutyTeam.Set(trio);
+            this.autoDutyTeam.Set(roster);
         }
 
         var overrides = new Dictionary<string, string>
@@ -348,7 +348,7 @@ public sealed class Plugin : IDalamudPlugin
         try
         {
             this.autoDuty.Run(territory, 1, true);
-            this.Chat($"[CruciblePilot] queued board {this.Config.Board} ({Configuration.DegreeName(this.Config.Degree)}) with trio {string.Join(", ", trio)}");
+            this.Chat($"[CruciblePilot] queued board {this.Config.Board} ({Configuration.DegreeName(this.Config.Degree)}) with roster {string.Join(", ", roster)}");
         }
         catch (Exception ex)
         {
