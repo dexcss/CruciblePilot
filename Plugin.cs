@@ -382,6 +382,23 @@ public sealed class Plugin : IDalamudPlugin
         this.pushedOverrides = true;
         this.cpLog.Info("pushed AutoDuty overrides: " + string.Join(", ", overrides.Select(kv => kv.Key + "=" + kv.Value)));
 
+        if (this.Config.FocusStrongestEnemy)
+        {
+            var rsr = new Dictionary<string, string>
+            {
+                ["DutyConfig.RSR.TargetingTypeNonTank"] = "HighMaxHP",
+                ["DutyConfig.RSR.TargetingTypeTank"] = "HighMaxHP",
+            };
+            if (this.autoDuty.Push(rsr))
+            {
+                this.cpLog.Info("pushed RSR targeting: HighMaxHP (attack the strongest enemy, not dying adds)");
+            }
+            else
+            {
+                this.cpLog.Warn("could not push RSR targeting overrides - AutoDuty keeps its default LowHP targeting");
+            }
+        }
+
         try
         {
             this.autoDuty.Run(territory, 1, true);

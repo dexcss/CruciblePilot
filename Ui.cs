@@ -148,6 +148,13 @@ public sealed class Ui
             this.plugin.SaveConfig();
         }
 
+        bool focusBoss = config.FocusStrongestEnemy;
+        if (ImGui.Checkbox("Attack the strongest enemy (boss) instead of dying adds", ref focusBoss))
+        {
+            config.FocusStrongestEnemy = focusBoss;
+            this.plugin.SaveConfig();
+        }
+
         bool setTeam = config.SetAutoDutyTeam;
         if (ImGui.Checkbox("Push roster into AutoDuty's custom team", ref setTeam))
         {

@@ -48,6 +48,9 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Eat the configured food before a run when the Well Fed buff is missing.</summary>
     public bool EatFood { get; set; } = true;
 
+    /// <summary>Push Rotation Solver targeting overrides so the bot attacks the strongest enemy (the boss), not dying adds.</summary>
+    public bool FocusStrongestEnemy { get; set; } = true;
+
     /// <summary>Food item the plugin asks the game to use.</summary>
     public string FoodItemName { get; set; } = "Rock-fisted Popoto Stew";
 
