@@ -178,6 +178,63 @@ public sealed class XszyysBridge : IDisposable
         }
     }
 
+    /// <summary>
+    /// Loads a shared dependency into the default context before the ACR asks for it. Picks the newest copy on
+    /// disk so the ACR's exact-version reference resolves to a real assembly.
+    /// </summary>
+    private static string PreloadDependency(string simpleName)
+    {
+        foreach (var loaded in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (string.Equals(loaded.GetName().Name, simpleName, StringComparison.OrdinalIgnoreCase))
+            {
+                return "already loaded " + loaded.GetName().Version;
+            }
+        }
+
+        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string[] roots =
+        {
+            Path.Combine(appData, "XIVLauncher", "addon", "Hooks"),
+            Path.Combine(appData, "XIVLauncher", "installedPlugins"),
+            Path.Combine(appData, "XIVLauncher", "devPlugins"),
+        };
+
+        string? best = null;
+        Version bestVersion = new(0, 0, 0, 0);
+        foreach (string file in SafeFind(roots, simpleName + ".dll"))
+        {
+            try
+            {
+                var name = AssemblyName.GetAssemblyName(file);
+                if (best == null || name.Version > bestVersion)
+                {
+                    best = file;
+                    bestVersion = name.Version ?? bestVersion;
+                }
+            }
+            catch
+            {
+                // unreadable candidate
+            }
+        }
+
+        if (best == null)
+        {
+            return "not found";
+        }
+
+        try
+        {
+            var assembly = Assembly.LoadFrom(best);
+            return $"loaded {assembly.GetName().Version} from {Path.GetDirectoryName(best)}";
+        }
+        catch (Exception ex)
+        {
+            return "failed " + ex.GetType().Name + ": " + ex.Message;
+        }
+    }
+
     private static string? FindRotationSolverAssembly()
     {
         string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "installedPlugins", "PromeRotation");
@@ -221,6 +278,14 @@ public sealed class XszyysBridge : IDisposable
             }
 
             AppDomain.CurrentDomain.AssemblyResolve += ResolveFromKnownPlaces;
+
+            // Preload the shared libraries the ACR binds against into the default context, so its type
+            // initialisers find a real assembly instead of failing the binder.
+            foreach (string dependency in new[] { "ECommons", "Dalamud", "FFXIVClientStructs", "InteropGenerator.Runtime", "CheapLoc" })
+            {
+                this.cpLog.Info($"bridge: preload {dependency} -> {PreloadDependency(dependency)}");
+            }
+
             var prAssembly = Assembly.LoadFrom(prPath);
             this.cpLog.Info($"bridge: PromeRotation {prAssembly.GetName().Version} loaded");
 
