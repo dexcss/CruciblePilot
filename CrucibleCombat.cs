@@ -325,11 +325,10 @@ public sealed class CrucibleCombat
         }
 
         // Trick costs 100 TP and pairs with the axe combo, so only weave it when the gauge supports the combo.
-        if (BeastGauge.TryRead(out var trickGauge) && trickGauge.TpGauge >= 100 && trickGauge.BeastPower >= 100 &&
-            actionManager->GetActionStatus(ActionType.Action, Trick) == 0 &&
+        if (actionManager->GetActionStatus(ActionType.Action, Trick) == 0 &&
             actionManager->UseAction(ActionType.Action, Trick, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
-            this.plugin.CpLog.Info($"combat: ogcd trick (tp {trickGauge.TpGauge} power {trickGauge.BeastPower})");
+            this.plugin.CpLog.Info("combat: ogcd trick");
             return;
         }
 
@@ -458,34 +457,20 @@ public sealed class CrucibleCombat
 
     private unsafe uint PickGcd(ActionManager* actionManager, IPlayerCharacter player)
     {
-        bool gaugeOk = BeastGauge.TryRead(out var gauge);
-        bool hasTp100 = !gaugeOk || gauge.TpGauge >= 100;
-        bool hasTp250 = gaugeOk && gauge.TpGauge >= 250;
-        bool hasPower100 = !gaugeOk || gauge.BeastPower >= 100;
-
-        // Burst: needs 250 TP and one of the burst statuses (4599 / 4600).
-        if (hasTp250 && this.plugin.Config.CombatBurst)
+        // The gauge offsets are not reliable on every client build, so the resource gates are left to the game:
+        // GetActionStatus already refuses actions when TP / beast power requirements are unmet.
+        if (this.plugin.Config.CombatBurst)
         {
-            uint burst = 0;
-            if (HasStatus(player, 4599))
-            {
-                burst = 44931;
-            }
-            else if (HasStatus(player, 4600))
-            {
-                burst = 44930;
-            }
-
+            uint burst = HasStatus(player, 4599) ? 44931u : HasStatus(player, 4600) ? 44930u : 0u;
             if (burst != 0 && actionManager->GetActionStatus(ActionType.Action, burst) == 0)
             {
                 return burst;
             }
         }
 
-        // Axe combo: 100 beast power and 100 TP, cycling the attribute axes.
-        if (hasPower100 && hasTp100)
+        // Attribute axes in cycle order; use whichever is off cooldown.
+        foreach (uint axe in new[] { AttributeAxe(player), AvalancheAxe, MistralAxe, SpinningAxe, GaleAxe })
         {
-            uint axe = AttributeAxe(player);
             if (axe != 0 && actionManager->GetActionStatus(ActionType.Action, axe) == 0)
             {
                 return axe;
