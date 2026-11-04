@@ -2,7 +2,7 @@
   "Author": "dexcss",
   "Name": "CruciblePilot",
   "InternalName": "CruciblePilot",
-  "AssemblyVersion": "0.12.3.0",
+  "AssemblyVersion": "0.13.0.0",
   "Description": "Drives FFXIV's Crucible of the Unbroken through AutoDuty: picks the difficulty (Standard through Third Degree), registers your team, reads the enemies standing in the arena, scores your familiars against their weaknesses and puts the best three on the battlehorns before every fight, then starts it. Includes a settings window, per-board fixed trios, and a run log for troubleshooting.",
   "ApplicableVersion": "any",
   "RepoUrl": "https://github.com/dexcss/CruciblePilot",

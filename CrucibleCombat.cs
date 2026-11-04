@@ -28,6 +28,7 @@ public sealed class CrucibleCombat
     private const uint BeastMode = 44886;
     private const uint RallyingCheer = 44904;
     private const uint Rally = 44905;
+    private const uint Burst = 44930;
     private const uint ShieldCharge = 44893;
     private const uint TemperedRelease = 44890;
     private const uint Borrow = 44895;
@@ -163,7 +164,27 @@ public sealed class CrucibleCombat
             return;
         }
 
-        foreach (uint ogcd in new[] { RallyingCheer, Rally, Trick, PartingBlow })
+        // Cheer/Rally spend instinct stacks, so only use them when the gauge says the stacks exist.
+        if (BeastGauge.TryRead(out var gauge))
+        {
+            if (gauge.NaturalInstinct > 0 &&
+                actionManager->GetActionStatus(ActionType.Action, RallyingCheer) == 0 &&
+                actionManager->UseAction(ActionType.Action, RallyingCheer, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            {
+                this.plugin.CpLog.Info($"combat: ogcd rallying cheer (natural {gauge.NaturalInstinct})");
+                return;
+            }
+
+            if (gauge.MasteredInstinct > 0 &&
+                actionManager->GetActionStatus(ActionType.Action, Rally) == 0 &&
+                actionManager->UseAction(ActionType.Action, Rally, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            {
+                this.plugin.CpLog.Info($"combat: ogcd rally (mastered {gauge.MasteredInstinct})");
+                return;
+            }
+        }
+
+        foreach (uint ogcd in new[] { Burst, Trick, PartingBlow })
         {
             if (actionManager->GetActionStatus(ActionType.Action, ogcd) == 0 &&
                 actionManager->UseAction(ActionType.Action, ogcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))

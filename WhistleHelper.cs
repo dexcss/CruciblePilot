@@ -60,7 +60,17 @@ public sealed class WhistleHelper
             return;
         }
 
-        // Latch whichever horn is inside its recast window; horns only recast in ~2s so keep the value afterwards.
+        // Prefer the job gauge (ActiveBattlehorn) and fall back to latching the horn recast window.
+        if (BeastGauge.TryRead(out var gauge))
+        {
+            int gaugeSlot = gauge.ActiveBattlehorn - 1;
+            if (gaugeSlot >= 0 && gaugeSlot <= 2 && gaugeSlot != this.activeHorn)
+            {
+                this.activeHorn = gaugeSlot;
+                this.plugin.CpLog.Info($"whistle: horn slot {gaugeSlot + 1} active (gauge) tp={gauge.TpGauge} petTp={gauge.PetTpGauge} combo={gauge.InstinctualComboState} natural={gauge.NaturalInstinct} mastered={gauge.MasteredInstinct}");
+            }
+        }
+
         this.DetectHorn();
 
         if (!this.hudDumped)
