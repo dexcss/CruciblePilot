@@ -162,7 +162,7 @@ public sealed class CrucibleCombat
         if (target != null)
         {
             float targetDistance = Distance(player.Position, target.Position);
-            if (targetDistance > 3.2f)
+            if (targetDistance > 5.5f)
             {
                 if (DateTime.UtcNow >= this.nextRangeLog)
                 {
@@ -564,7 +564,7 @@ public sealed class CrucibleCombat
         // still close; otherwise pick the nearest hostile.
         var current = this.targetManager.Target as IBattleNpc;
         if (current != null && current.CurrentHp > 0 && current.IsTargetable &&
-            Distance(player.Position, current.Position) <= 5f)
+            Distance(player.Position, current.Position) <= 8f)
         {
             return current;
         }
