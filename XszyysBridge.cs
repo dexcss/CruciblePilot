@@ -38,6 +38,9 @@ public sealed class XszyysBridge : IDisposable
     private readonly List<(PropertyInfo Field, string Name)> checkReaders = new();
     private readonly List<(PropertyInfo Field, string Name)> actionReaders = new();
     private DateTime nextTick = DateTime.MinValue;
+    private DateTime lastActionAt = DateTime.MinValue;
+    private DateTime combatSince = DateTime.MinValue;
+    private bool broken;
     private bool loadAttempted;
 
     public XszyysBridge(IPluginLog log, CpLog cpLog, ITargetManager targetManager)
@@ -49,9 +52,59 @@ public sealed class XszyysBridge : IDisposable
 
     public bool Loaded => this.loaded.Count > 0;
 
+    public bool Broken => this.broken;
+
     public void Dispose()
     {
         this.loaded.Clear();
+    }
+
+    /// <summary>Resolves Dalamud / FFXIVClientStructs / ECommons for the loaded ACR assemblies.</summary>
+    private static Assembly? ResolveFromKnownPlaces(object? sender, ResolveEventArgs args)
+    {
+        string simple = new AssemblyName(args.Name).Name ?? string.Empty;
+        if (simple.Length == 0)
+        {
+            return null;
+        }
+
+        foreach (var loaded in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (string.Equals(loaded.GetName().Name, simple, StringComparison.OrdinalIgnoreCase))
+            {
+                return loaded;
+            }
+        }
+
+        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string[] roots =
+        {
+            Path.Combine(appData, "XIVLauncher", "addon", "Hooks"),
+            Path.Combine(appData, "XIVLauncher", "installedPlugins", "PromeRotation"),
+            Path.Combine(appData, "XIVLauncher", "pluginConfigs", "PromeRotation", "ACR", "XSZYYS"),
+        };
+
+        foreach (string root in roots)
+        {
+            if (!Directory.Exists(root))
+            {
+                continue;
+            }
+
+            foreach (string file in Directory.GetFiles(root, simple + ".dll", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    return Assembly.LoadFrom(file);
+                }
+                catch
+                {
+                    // try next candidate
+                }
+            }
+        }
+
+        return null;
     }
 
     private static string? FindRotationSolverAssembly()
@@ -96,6 +149,7 @@ public sealed class XszyysBridge : IDisposable
                 return false;
             }
 
+            AppDomain.CurrentDomain.AssemblyResolve += ResolveFromKnownPlaces;
             var prAssembly = Assembly.LoadFrom(prPath);
             this.cpLog.Info($"bridge: PromeRotation {prAssembly.GetName().Version} loaded");
 
@@ -172,6 +226,23 @@ public sealed class XszyysBridge : IDisposable
             return;
         }
 
+        if (this.combatSince == DateTime.MinValue)
+        {
+            this.combatSince = DateTime.UtcNow;
+        }
+
+        if (DateTime.UtcNow - this.combatSince > TimeSpan.FromSeconds(6) &&
+            (this.lastActionAt == DateTime.MinValue || DateTime.UtcNow - this.lastActionAt > TimeSpan.FromSeconds(6)))
+        {
+            if (!this.broken)
+            {
+                this.broken = true;
+                this.cpLog.Info("bridge: produced no actions for 6s, falling back to the built-in loop");
+            }
+
+            return;
+        }
+
         foreach (var (instance, offGcd, check, getAction) in this.loaded)
         {
             object? result;
@@ -228,6 +299,7 @@ public sealed class XszyysBridge : IDisposable
 
             if (actionManager->UseAction(ActionType.Action, use, targetId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
+                this.lastActionAt = DateTime.UtcNow;
                 this.cpLog.Info($"bridge: {instance.GetType().Name} -> {use} ({(offGcd ? "oGCD" : "GCD")})");
                 return;
             }

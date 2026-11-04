@@ -103,7 +103,7 @@ public sealed class Plugin : IDalamudPlugin
         this.degree.Tick();
         this.whistle.Tick();
 
-        if (this.Config.UseXszyysBridge && this.bridge.Loaded)
+        if (this.Config.UseXszyysBridge && this.bridge.Loaded && !this.bridge.Broken)
         {
             this.bridge.Tick(this.clientState.TerritoryType);
         }
