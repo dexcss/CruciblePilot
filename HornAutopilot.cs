@@ -140,6 +140,25 @@ public sealed unsafe class HornAutopilot
         if (target.Any(t => !aliveNumbers.Contains(t)))
         {
             var substituted = target.Where(aliveNumbers.Contains).ToList();
+
+            // Prefer replacements that still match the encounter's weaknesses before falling back to raw HP.
+            if (weaknesses.Count > 0 && substituted.Count < 3)
+            {
+                var candidates = aliveNumbers.Where(n => !substituted.Contains(n)).ToList();
+                foreach (uint pick in this.plugin.Intel.PickFromTags(candidates, weaknesses, out _))
+                {
+                    if (substituted.Count >= 3)
+                    {
+                        break;
+                    }
+
+                    if (!substituted.Contains(pick))
+                    {
+                        substituted.Add(pick);
+                    }
+                }
+            }
+
             foreach (var row in alive.OrderByDescending(r => r.Hp).ThenBy(r => r.Number))
             {
                 if (substituted.Count >= 3)
