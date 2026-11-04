@@ -65,18 +65,26 @@ public sealed class WhistleHelper
             return;
         }
 
-        // Prefer the job gauge (ActiveBattlehorn) and fall back to latching the horn recast window.
+        // The gauge whistle index is authoritative; the recast latch is only a fallback for when it reads 0.
+        bool gaugeSlotFound = false;
         if (BeastGauge.TryRead(out var gauge))
         {
             int gaugeSlot = gauge.WhistleIndex - 1;
-            if (gaugeSlot >= 0 && gaugeSlot <= 2 && gaugeSlot != this.activeHorn)
+            if (gaugeSlot >= 0 && gaugeSlot <= 2)
             {
-                this.activeHorn = gaugeSlot;
-                this.plugin.CpLog.Info($"whistle: horn slot {gaugeSlot + 1} active (gauge) tp={gauge.Tp} power={gauge.BeastPower} whistle={gauge.WhistleIndex} heart={gauge.BeastHeart}");
+                gaugeSlotFound = true;
+                if (gaugeSlot != this.activeHorn)
+                {
+                    this.activeHorn = gaugeSlot;
+                    this.plugin.CpLog.Info($"whistle: horn slot {gaugeSlot + 1} active (gauge) tp={gauge.Tp} power={gauge.BeastPower} whistle={gauge.WhistleIndex} heart={gauge.BeastHeart}");
+                }
             }
         }
 
-        this.DetectHorn();
+        if (!gaugeSlotFound)
+        {
+            this.DetectHorn();
+        }
 
         if (!this.hudDumped)
         {
@@ -118,14 +126,6 @@ public sealed class WhistleHelper
             return;
         }
 
-        // Borrow is also a 30s cooldown that feeds kinship, so keep it rolling when the familiar is up.
-        if (actionManager->GetActionStatus(ActionType.Action, Borrow) == 0 &&
-            actionManager->UseAction(ActionType.Action, Borrow, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
-        {
-            this.plugin.CpLog.Info($"whistle: borrow on cooldown (horn slot {slot + 1})");
-            return;
-        }
-
         bool wantBorrow = slot == 2 && this.plugin.Config.WhistleAutoBorrow;
         if (wantBorrow)
         {
@@ -145,15 +145,8 @@ public sealed class WhistleHelper
 
         if (hpPercent > threshold)
         {
-            // Tempered Release is a 30s pet nuke (current id 47092, reached through the adjusted-action lookup).
-            uint releaseOnCooldown = actionManager->GetAdjustedActionId(TemperedRelease);
-            if (actionManager->GetActionStatus(ActionType.Action, releaseOnCooldown) == 0 &&
-                actionManager->UseAction(ActionType.Action, releaseOnCooldown, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
-            {
-                LastReleaseAt = DateTime.UtcNow;
-                this.plugin.CpLog.Info($"whistle: tempered release on cooldown at target {hpPercent:F0}% (id {releaseOnCooldown})");
-            }
-
+            // Hold the pet: the finisher is only worth spending when the target is under the horn threshold,
+            // and freeing the familiar early means nothing is left to tank.
             return;
         }
 
