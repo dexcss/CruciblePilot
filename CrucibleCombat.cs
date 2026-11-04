@@ -56,6 +56,7 @@ public sealed class CrucibleCombat
     private DateTime summonPendingUntil = DateTime.MinValue;
     private DateTime lastSummonAt = DateTime.MinValue;
     private DateTime nextDiagnostic = DateTime.MinValue;
+    private DateTime lastPotionAt = DateTime.MinValue;
     private DateTime countdownStartedAt = DateTime.MinValue;
     private bool countdownHorn3;
     private bool countdownBorrow;
@@ -380,7 +381,7 @@ public sealed class CrucibleCombat
         }
 
         double hp = player.MaxHp == 0 ? 100 : (double)player.CurrentHp / player.MaxHp * 100;
-        if (hp > this.plugin.Config.CombatPotionHpPercent)
+        if (hp > this.plugin.Config.CombatPotionHpPercent || DateTime.UtcNow - this.lastPotionAt < TimeSpan.FromSeconds(3))
         {
             return;
         }
@@ -391,6 +392,7 @@ public sealed class CrucibleCombat
             var entry = entries.FirstOrDefault(e => e.ItemId == potion && e.Available);
             if (entry.ItemId == potion && this.items.Use((uint)entry.Slot))
             {
+                this.lastPotionAt = DateTime.UtcNow;
                 this.plugin.CpLog.Info($"combat: used potion #{potion} from slot {entry.Slot} at {hp:F0}% hp");
                 return;
             }
