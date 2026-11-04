@@ -25,6 +25,7 @@ public sealed class CrucibleCombat
     private const uint GaleAxe = 44889;
     private const uint Trick = 47093;
     private const uint PartingBlow = 44891;
+    private const uint BeastMode = 44886;
     private const uint ShieldCharge = 44893;
     private const uint TemperedRelease = 44890;
     private const uint Borrow = 44895;
@@ -42,6 +43,7 @@ public sealed class CrucibleCombat
     private uint comboAction;
     private DateTime comboAt = DateTime.MinValue;
     private int hornStage;
+    private DateTime summonPendingUntil = DateTime.MinValue;
     private DateTime lastHornAt = DateTime.MinValue;
 
     public CrucibleCombat(Plugin plugin, IObjectTable objects, ITargetManager targetManager, ICondition condition, IClientState clientState, CrucibleItems items)
@@ -115,24 +117,27 @@ public sealed class CrucibleCombat
             this.comboStage = 0;
         }
 
-        // Battlehorns: one at a time, in order, spaced by the configured interval so the opener does not
-        // replace its own familiars instantly.
-        if (this.plugin.Config.CombatHorns && this.hornStage < Horns.Length)
+        // Battlehorns: XSZYYS only summons when no familiar is out (plus a 3s pending window for the 1s cast
+        // and latency), and cycles through the three horns.
+        if (this.plugin.Config.CombatHorns)
         {
-            bool intervalElapsed = DateTime.UtcNow - this.lastHornAt >= TimeSpan.FromSeconds(this.plugin.Config.CombatHornIntervalSeconds);
-            if (intervalElapsed &&
-                actionManager->GetActionStatus(ActionType.Action, Horns[this.hornStage]) == 0 &&
-                actionManager->UseAction(ActionType.Action, Horns[this.hornStage], 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            bool familiarOut = this.HasFamiliar(player);
+            if (!familiarOut && DateTime.UtcNow >= this.summonPendingUntil)
             {
-                this.plugin.CpLog.Info($"combat: summon horn {this.hornStage + 1}");
-                this.lastHornAt = DateTime.UtcNow;
-                this.hornStage++;
-                return;
+                uint horn = Horns[this.hornStage % Horns.Length];
+                if (actionManager->GetActionStatus(ActionType.Action, horn) == 0 &&
+                    actionManager->UseAction(ActionType.Action, horn, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+                {
+                    this.plugin.CpLog.Info($"combat: summon horn {(this.hornStage % Horns.Length) + 1}");
+                    this.hornStage = (this.hornStage + 1) % Horns.Length;
+                    this.summonPendingUntil = DateTime.UtcNow.AddSeconds(3);
+                    return;
+                }
             }
         }
 
         // oGCDs first so they weave before the GCD lock.
-        foreach (uint ogcd in new[] { Trick, PartingBlow, ShieldCharge })
+        foreach (uint ogcd in new[] { ShieldCharge, BeastMode, Trick, PartingBlow })
         {
             if (actionManager->GetActionStatus(ActionType.Action, ogcd) == 0 &&
                 actionManager->UseAction(ActionType.Action, ogcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
@@ -212,6 +217,19 @@ public sealed class CrucibleCombat
                 return;
             }
         }
+    }
+
+    private bool HasFamiliar(Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter player)
+    {
+        foreach (var obj in this.objects)
+        {
+            if (obj is IBattleNpc npc && npc.OwnerId == player.GameObjectId && npc.CurrentHp > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private IBattleNpc? EnsureTarget()
