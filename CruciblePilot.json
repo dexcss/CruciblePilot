@@ -1,0 +1,15 @@
+{
+  "Name": "CruciblePilot",
+  "Author": "CruciblePilot",
+  "Description": "AutoDuty-driven Crucible of the Unbroken runs with degree selection and encounter-ready battlehorn assignment.",
+  "InternalName": "CruciblePilot",
+  "AssemblyVersion": "0.1.0.0",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": true,
+  "Punchline": "Crucible runs with the beasts you actually want on the horns.",
+  "AcceptsFeedback": false,
+  "IsDev": true
+}
