@@ -35,6 +35,7 @@ public sealed class Ui
 
     private readonly Plugin plugin;
     private string? rosterText;
+    private int lastBoard = -1;
 
     public Ui(Plugin plugin) => this.plugin = plugin;
 
@@ -90,14 +91,14 @@ public sealed class Ui
 
         ImGui.Separator();
         ImGui.TextUnformatted("Roster AutoDuty registers (numbers, comma separated; up to the board's cap)");
-        this.rosterText ??= Configuration.FormatRoster(config.Roster);
+        if (this.lastBoard != config.Board) { this.lastBoard = config.Board; this.rosterText = Configuration.FormatRoster(config.RosterFor(config.Board)); }
         ImGui.SetNextItemWidth(390);
         if (ImGui.InputText("Roster", ref this.rosterText, 512))
         {
             var parsed = Configuration.ParseRoster(this.rosterText);
             if (parsed.Count > 0)
             {
-                config.Roster = parsed;
+                config.BoardRosters[config.Board] = parsed;
                 this.plugin.SaveConfig();
             }
         }
@@ -157,6 +158,13 @@ public sealed class Ui
         if (ImGui.Checkbox("Pick the trio from the enemies in the arena", ref autoPick))
         {
             config.AutoPick = autoPick;
+            this.plugin.SaveConfig();
+        }
+
+        bool useDefaults = config.UseDefaults;
+        if (ImGui.Checkbox("Prefer the curated per-fight trios", ref useDefaults))
+        {
+            config.UseDefaults = useDefaults;
             this.plugin.SaveConfig();
         }
 

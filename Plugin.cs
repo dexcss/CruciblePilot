@@ -278,7 +278,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public void ApplyTeam()
     {
-        var trio = this.Config.Trio(this.Config.Board);
+        var trio = this.Config.RosterFor(this.Config.Board);
         if (trio.Count == 0)
         {
             this.Chat("[CruciblePilot] pick a trio first");
@@ -292,7 +292,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public void StartRun()
     {
-        var roster = this.Config.Roster.Distinct().Where(n => n is >= 1 and <= 50).ToList();
+        var roster = this.Config.RosterFor(this.Config.Board).Distinct().Where(n => n is >= 1 and <= 50).ToList();
         if (roster.Count < 3)
         {
             this.Chat("[CruciblePilot] set a roster of at least three familiars (window: Roster field)");

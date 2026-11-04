@@ -125,6 +125,98 @@ public sealed class EnemyIntel
         this.log = log;
     }
 
+    /// <summary>
+    /// Hand-curated trio per encounter, built from the community encounter lists (Off Duty / Eorzean Tavern /
+    /// Icy Veins) cross-referenced with the beast picks those guides name. Used as the default before the
+    /// live scorer.
+    /// </summary>
+    private static readonly Dictionary<int, (string Label, string[] Patterns, uint[] Trio)[]> Defaults = new()
+    {
+        [1] = new[]
+        {
+            ("Bone Knight/Bishop - blunt", new[] { "bone knight", "bone bishop" }, new uint[] { 5, 31, 1 }),
+            ("Arch Demon/Piscodemon - lightning/slashing", new[] { "arch demon", "piscodemon" }, new uint[] { 33, 13, 1 }),
+            ("Banemite/Mitelings - ice", new[] { "banemite", "mitelings" }, new uint[] { 31, 1, 13 }),
+            ("Ogre/Wisps - wind/water", new[] { "ogre", "wisp" }, new uint[] { 31, 5, 1 }),
+            ("Pas de Seul - piercing, fire adds", new[] { "pas de seul", "succubus" }, new uint[] { 1, 29, 11 }),
+        },
+        [2] = new[]
+        {
+            ("Manticore - wind", new[] { "manticore" }, new uint[] { 40, 33, 2 }),
+            ("Taurus/Ahriman/Wyvern - pierce/ice/lightning", new[] { "taurus", "ahriman", "wyvern" }, new uint[] { 33, 23, 13 }),
+            ("Voidmancer/Zombies - earth/ice", new[] { "voidmancer", "zombie" }, new uint[] { 23, 13, 38 }),
+            ("Tablitaurs - fire", new[] { "tablitaur" }, new uint[] { 29, 38, 34 }),
+            ("Demon pack - slashing/ice/earth", new[] { "demon", "evil weapon", "devilet" }, new uint[] { 16, 23, 29 }),
+            ("Loosefrox/Chewchum - blunt/water", new[] { "loosefrox", "chewchum" }, new uint[] { 5, 31, 41 }),
+        },
+        [3] = new[]
+        {
+            ("Cavalier/Bishops - fire/blunt", new[] { "cavalier", "bone bishop" }, new uint[] { 34, 2, 50 }),
+            ("Ymir/Sahagin - ice/blunt", new[] { "ymir", "sahagin" }, new uint[] { 26, 47, 13 }),
+            ("Zu/Catoblepas - earth/wind", new[] { "zu", "catoblepas" }, new uint[] { 23, 28, 15 }),
+            ("Lakhamu/Golems - water", new[] { "lakhamu", "golem" }, new uint[] { 15, 23, 26 }),
+            ("Siren/undead - pierce/fire", new[] { "siren", "crawler" }, new uint[] { 1, 34, 10 }),
+            ("Campeador/Guardia - lightning/ice", new[] { "campeador", "guardia" }, new uint[] { 50, 47, 13 }),
+            ("Guttler - Thanatos adds lightning", new[] { "guttler", "thanatos" }, new uint[] { 34, 2, 26 }),
+        },
+        [4] = new[]
+        {
+            ("Strix - piercing", new[] { "strix" }, new uint[] { 16, 44, 10 }),
+            ("Morbol route - slash/ice/wind/blunt", new[] { "morbol", "corpse flower", "ochu", "seedling", "carrion broth", "queen hawk" }, new uint[] { 16, 15, 26 }),
+            ("Ice Dragon/sprites - fire", new[] { "ice dragon", "ice sprite" }, new uint[] { 29, 34, 16 }),
+            ("Gargoyle - no weakness", new[] { "gargoyle" }, new uint[] { 16, 10, 23 }),
+            ("Administrator - lightning, Cobra piercing", new[] { "administrator", "cobra", "dreadnaught" }, new uint[] { 50, 1, 15 }),
+            ("Golem/Treant - water/blunt/ice", new[] { "golem", "treant", "slug", "sapling", "diremite", "biloko" }, new uint[] { 15, 26, 23 }),
+            ("Progenitrix - wind/fire/water", new[] { "progenitrix", "grenade", "bomb", "snoll", "pyrobolus" }, new uint[] { 31, 34, 15 }),
+            ("Borgny/Toxic Mass - earth/water", new[] { "borgny", "toxic mass" }, new uint[] { 23, 28, 15 }),
+        },
+        [5] = new[]
+        {
+            ("Flauros/sprites - earth", new[] { "flauros", "lightning sprite" }, new uint[] { 23, 28, 40 }),
+            ("Mindflayer/Myconids - slash/water", new[] { "mindflayer", "myconid" }, new uint[] { 16, 15, 13 }),
+            ("Boogyman/Atomos/Drake - ice/blunt/wind", new[] { "boogyman", "atomos", "drake", "barbmole" }, new uint[] { 47, 26, 34 }),
+            ("Durga/Spinner-rooks - fire/blunt", new[] { "durga", "spinner-rook" }, new uint[] { 34, 26, 13 }),
+            ("Medusa/Lamia - piercing", new[] { "medusa", "lamia" }, new uint[] { 10, 1, 44 }),
+            ("Chimera/Sphinx - water/slash", new[] { "chimera", "sphinx" }, new uint[] { 15, 16, 13 }),
+            ("Gigantis - earth/wind", new[] { "gigantis", "congealed" }, new uint[] { 23, 34, 13 }),
+            ("Moogles - lightning/blunt/water", new[] { "moogle", "kupo" }, new uint[] { 50, 26, 15 }),
+            ("Behemoth/King Ahriman - earth/lightning/ice", new[] { "behemoth", "king ahriman", "hapalit" }, new uint[] { 23, 15, 34 }),
+            ("Lauda/Thanatos - lightning adds", new[] { "lauda", "thanatos" }, new uint[] { 1, 16, 13 }),
+        },
+    };
+
+    /// <summary>The curated trio for the encounter whose enemy names match best; empty when nothing matches.</summary>
+    public List<uint> DefaultTrio(int board, IReadOnlyList<string> enemies, out string label)
+    {
+        label = string.Empty;
+        if (!Defaults.TryGetValue(board, out var entries) || enemies.Count == 0)
+        {
+            return new List<uint>();
+        }
+
+        string joined = string.Join(" ", enemies).ToLowerInvariant();
+        (string Label, string[] Patterns, uint[] Trio)? best = null;
+        int bestHits = 0;
+        foreach (var entry in entries)
+        {
+            int hits = entry.Patterns.Count(p => joined.Contains(p, StringComparison.Ordinal));
+            if (hits > bestHits)
+            {
+                bestHits = hits;
+                best = entry;
+            }
+        }
+
+        if (best == null)
+        {
+            return new List<uint>();
+        }
+
+        label = best.Value.Label;
+        return best.Value.Trio.ToList();
+    }
+
+
     /// <summary>Hostile-looking battle NPCs within range of the player (the arena's current encounter).</summary>
     public List<string> CurrentEnemies(float maxDistance = 60f)
     {

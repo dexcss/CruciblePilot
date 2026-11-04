@@ -28,11 +28,29 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Familiar numbers AutoDuty registers as the team; the per-fight picker chooses three of these.</summary>
     public List<uint> Roster { get; set; } = new() { 1, 2, 10, 13, 15, 16, 23, 25, 26, 28, 29, 31, 34, 40, 47 };
 
+    /// <summary>Roster per board, sized to that board's cap and covering every curated trio for it.</summary>
+    public Dictionary<int, List<uint>> BoardRosters { get; set; } = DefaultRosters();
+
+    public static Dictionary<int, List<uint>> DefaultRosters() => new()
+    {
+        [1] = new() { 1, 5, 11, 13, 23, 29, 31, 33, 2, 40 },
+        [2] = new() { 2, 5, 13, 16, 23, 29, 31, 33, 34, 38, 40, 41 },
+        [3] = new() { 1, 2, 10, 13, 15, 16, 23, 26, 28, 29, 31, 34, 47, 50 },
+        [4] = new() { 1, 10, 15, 16, 23, 26, 28, 29, 31, 34, 44, 50 },
+        [5] = new() { 1, 2, 10, 13, 15, 16, 23, 26, 28, 29, 34, 40, 44, 47, 50 },
+    };
+
+    public List<uint> RosterFor(int board)
+        => this.BoardRosters.TryGetValue(board, out var list) && list.Count > 0 ? list : this.Roster;
+
     /// <summary>Try to rewrite AutoDuty's CustomTeam via reflection before starting a run.</summary>
     public bool SetAutoDutyTeam { get; set; } = true;
 
     /// <summary>Pick the trio from the enemies currently in the arena instead of the fixed list.</summary>
     public bool AutoPick { get; set; } = true;
+
+    /// <summary>Prefer the curated per-encounter trio table over the live sheet scorer.</summary>
+    public bool UseDefaults { get; set; } = true;
 
     /// <summary>Whether the settings window is shown.</summary>
     public bool ShowWindow { get; set; } = true;

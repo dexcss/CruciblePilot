@@ -212,9 +212,22 @@ public sealed unsafe class HornAutopilot
             return fixedTrio;
         }
 
+        // Curated per-encounter default first (community picks), live scoring only for unknown encounters.
+        if (this.plugin.Config.UseDefaults)
+        {
+            var curated = this.plugin.Intel.DefaultTrio(board, enemies, out string label);
+            if (curated.Count == 3 && curated.All(roster.Contains))
+            {
+                this.LastPickReason = "default: " + label;
+                this.plugin.CpLog.Info("encounter [" + string.Join(", ", enemies) + "] -> default " + label + " " + string.Join(",", curated));
+                this.cachedPick = curated;
+                return curated;
+            }
+        }
+
         var picks = this.plugin.Intel.PickTrio(roster.ToList(), out string reason);
         this.LastPickReason = reason;
-        this.plugin.CpLog.Info("encounter [" + string.Join(", ", enemies) + "] -> pick " + string.Join(",", picks) + " (" + reason + ")");
+        this.plugin.CpLog.Info("encounter [" + string.Join(", ", enemies) + "] -> scored pick " + string.Join(",", picks) + " (" + reason + ")");
         if (picks.Count != 3 || picks.Any(p => !roster.Contains(p)))
         {
             this.log.Debug($"[CP] encounter picker fell back to the configured trio ({reason})");
