@@ -41,7 +41,8 @@ public sealed class CrucibleCombat
     private int comboStage;
     private uint comboAction;
     private DateTime comboAt = DateTime.MinValue;
-    private int hornIndex;
+    private int hornStage;
+    private DateTime lastHornAt = DateTime.MinValue;
 
     public CrucibleCombat(Plugin plugin, IObjectTable objects, ITargetManager targetManager, ICondition condition, IClientState clientState, CrucibleItems items)
     {
@@ -59,11 +60,24 @@ public sealed class CrucibleCombat
         if (territory is < 1339 or > 1343)
         {
             this.comboStage = 0;
-            this.hornIndex = 0;
+            this.hornStage = 0;
+            this.lastHornAt = DateTime.MinValue;
             return;
         }
 
-        if (!this.plugin.Config.EnableCombat || !this.condition[ConditionFlag.InCombat])
+        if (!this.condition[ConditionFlag.InCombat])
+        {
+            // New fight: start the horn order over once we have been out of combat for a moment.
+            if (this.hornStage > 0 && DateTime.UtcNow - this.lastHornAt > TimeSpan.FromSeconds(5))
+            {
+                this.hornStage = 0;
+                this.comboStage = 0;
+            }
+
+            return;
+        }
+
+        if (!this.plugin.Config.EnableCombat)
         {
             return;
         }
@@ -101,18 +115,19 @@ public sealed class CrucibleCombat
             this.comboStage = 0;
         }
 
-        // Battlehorns: press the next one that is ready (recast only runs after the familiar retreats).
-        if (this.plugin.Config.CombatHorns)
+        // Battlehorns: one at a time, in order, spaced by the configured interval so the opener does not
+        // replace its own familiars instantly.
+        if (this.plugin.Config.CombatHorns && this.hornStage < Horns.Length)
         {
-            for (int i = 0; i < Horns.Length; i++)
+            bool intervalElapsed = DateTime.UtcNow - this.lastHornAt >= TimeSpan.FromSeconds(this.plugin.Config.CombatHornIntervalSeconds);
+            if (intervalElapsed &&
+                actionManager->GetActionStatus(ActionType.Action, Horns[this.hornStage]) == 0 &&
+                actionManager->UseAction(ActionType.Action, Horns[this.hornStage], 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
             {
-                if (actionManager->GetActionStatus(ActionType.Action, Horns[i]) == 0 &&
-                    actionManager->UseAction(ActionType.Action, Horns[i], 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
-                {
-                    this.hornIndex = i;
-                    this.plugin.CpLog.Info($"combat: summon horn {i + 1}");
-                    return;
-                }
+                this.plugin.CpLog.Info($"combat: summon horn {this.hornStage + 1}");
+                this.lastHornAt = DateTime.UtcNow;
+                this.hornStage++;
+                return;
             }
         }
 

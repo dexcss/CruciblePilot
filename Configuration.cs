@@ -34,6 +34,9 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Run our own Beastmaster Crucible rotation (replaces RSR inside the arena).</summary>
     public bool EnableCombat { get; set; } = true;
 
+    /// <summary>Seconds between battlehorn summons so the opener does not replace its own familiars instantly.</summary>
+    public int CombatHornIntervalSeconds { get; set; } = 12;
+
     /// <summary>Summon the battlehorns ourselves as part of the combat loop.</summary>
     public bool CombatHorns { get; set; } = true;
 
