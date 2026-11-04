@@ -345,20 +345,7 @@ public sealed unsafe class HornAutopilot
             this.LastEnemies = enemies;
         }
 
-        // Curated per-encounter default first (community picks).
-        if (this.plugin.Config.UseDefaults)
-        {
-            var curated = this.plugin.Intel.DefaultTrio(board, enemies, out string label);
-            if (curated.Count == 3 && curated.All(roster.Contains))
-            {
-                this.LastPickReason = "default: " + label;
-                this.plugin.CpLog.Info("encounter [" + string.Join(", ", enemies) + "] -> default " + label + " " + string.Join(",", curated));
-                this.cachedPick = curated;
-                return curated;
-            }
-        }
-
-        // Otherwise pick from the weaknesses the stage window shows.
+        // The stage window lists the encounter's weaknesses; answer those directly (authoritative beast-element table).
         if (weaknesses.Count > 0)
         {
             var picks = this.plugin.Intel.PickFromTags(roster.ToList(), weaknesses, out string reason);
@@ -368,6 +355,19 @@ public sealed unsafe class HornAutopilot
                 this.plugin.CpLog.Info("encounter [" + string.Join(", ", enemies) + "] -> weakness pick " + string.Join(",", picks) + " (" + reason + ")");
                 this.cachedPick = picks;
                 return picks;
+            }
+        }
+
+        // Fall back to the curated per-encounter list when the stage window shows no usable weakness.
+        if (this.plugin.Config.UseDefaults)
+        {
+            var curated = this.plugin.Intel.DefaultTrio(board, enemies, out string label);
+            if (curated.Count == 3 && curated.All(roster.Contains))
+            {
+                this.LastPickReason = "default: " + label;
+                this.plugin.CpLog.Info("encounter [" + string.Join(", ", enemies) + "] -> default " + label + " " + string.Join(",", curated));
+                this.cachedPick = curated;
+                return curated;
             }
         }
 

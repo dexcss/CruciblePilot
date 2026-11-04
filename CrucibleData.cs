@@ -78,11 +78,11 @@ public static class CrucibleData
     /// <summary>Rosters sized to each board's cap, covering every trio above.</summary>
     public static Dictionary<int, List<uint>> DefaultRosters() => new()
     {
-        [1] = new() { 1, 4, 5, 11, 13, 21, 25, 29, 31, 40 },
-        [2] = new() { 1, 2, 5, 11, 13, 20, 23, 26, 29, 33, 40, 41 },
-        [3] = new() { 1, 2, 10, 13, 15, 21, 23, 26, 29, 34, 40, 41, 47, 50 },
-        [4] = new() { 1, 10, 13, 15, 16, 21, 23, 26, 29, 35, 40, 50 },
-        [5] = new() { 1, 10, 11, 13, 15, 16, 21, 23, 26, 28, 29, 40, 41, 47, 50 },
+        [1] = new() { 29, 20, 48, 1, 7, 21, 4, 11, 13, 5 },
+        [2] = new() { 29, 20, 48, 1, 7, 21, 4, 11, 13, 5, 26, 36 },
+        [3] = new() { 50, 31, 48, 36, 21, 4, 11, 23, 13, 5, 34, 29, 10, 26 },
+        [4] = new() { 50, 31, 48, 36, 21, 4, 11, 23, 13, 5, 34, 16 },
+        [5] = new() { 50, 31, 48, 36, 21, 4, 11, 23, 13, 5, 34, 16, 29, 26, 10 },
     };
 
     public static (string Label, string[] Patterns, uint[] Trio)? Match(int board, IEnumerable<string> enemies)

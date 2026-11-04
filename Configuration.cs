@@ -8,7 +8,7 @@ namespace CruciblePilot;
 [Serializable]
 public sealed class Configuration : IPluginConfiguration
 {
-    public int Version { get; set; } = 2;
+    public int Version { get; set; } = 3;
 
     /// <summary>Master switch for the battlehorn autopilot.</summary>
     public bool Autopilot { get; set; } = true;

@@ -65,10 +65,10 @@ public sealed class Plugin : IDalamudPlugin
         this.items = new ItemHelper(this, objects);
         this.condition = condition;
 
-        if (this.Config.Version < 2)
+        if (this.Config.Version < 3)
         {
             this.Config.BoardRosters = CrucibleData.DefaultRosters();
-            this.Config.Version = 2;
+            this.Config.Version = 3;
             pluginInterface.SavePluginConfig(this.Config);
             log.Information("[CP] migrated config to v2: per-board rosters reset to the curated defaults");
         }
