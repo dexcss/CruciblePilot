@@ -157,15 +157,14 @@ public sealed class Plugin : IDalamudPlugin
         this.TickCrucibleBuffs();
     }
 
-    private int buffIndex;
-    private bool buffRoundDone;
+    private readonly HashSet<uint> buffUsed = new();
     private DateTime nextBuffTry = DateTime.MinValue;
     private uint buffTerritory;
 
     /// <summary>
-    /// Drinks the defensive Crucible consumables once per board entry: G2 Beastmaster Reraisser (95% auto-revive),
-    /// Temporal Sand (rewind to fight start on KO), Beast Potion Kit (auto-potion) and Beast Remedy Kit (auto-remedy).
-    /// They must be in hand, so this only works when AutoDuty has bought them from the shop list.
+    /// Drinks the defensive Crucible consumables (G2 Beastmaster Reraisser, Beast Potion Kit, Beast Remedy Kit,
+    /// Temporal Sand). They are bought at shop nodes during the board, so this keeps checking the bags between
+    /// fights instead of only at board entry, and re-drinks anything AutoDuty has bought since.
     /// </summary>
     private void TickCrucibleBuffs()
     {
@@ -177,8 +176,7 @@ public sealed class Plugin : IDalamudPlugin
         uint territory = this.clientState.TerritoryType;
         if (territory is < 1339 or > 1343)
         {
-            this.buffRoundDone = false;
-            this.buffIndex = 0;
+            this.buffUsed.Clear();
             this.buffTerritory = 0;
             return;
         }
@@ -186,41 +184,40 @@ public sealed class Plugin : IDalamudPlugin
         if (this.buffTerritory != territory)
         {
             this.buffTerritory = territory;
-            this.buffRoundDone = false;
-            this.buffIndex = 0;
+            this.buffUsed.Clear();
             this.nextBuffTry = DateTime.MinValue;
         }
 
-        if (this.buffRoundDone || DateTime.UtcNow < this.nextBuffTry)
-        {
-            return;
-        }
-
-        if (this.condition[ConditionFlag.InCombat])
+        if (DateTime.UtcNow < this.nextBuffTry || this.condition[ConditionFlag.InCombat])
         {
             return; // these are board consumables; drink them between fights
         }
 
-        this.nextBuffTry = DateTime.UtcNow.AddSeconds(1);
+        this.nextBuffTry = DateTime.UtcNow.AddSeconds(2);
 
-        if (this.buffIndex >= this.Config.BuffItemIds.Count)
+        foreach (uint itemId in this.Config.BuffItemIds)
         {
-            this.buffRoundDone = true;
-            return;
-        }
+            if (this.buffUsed.Contains(itemId))
+            {
+                continue;
+            }
 
-        uint itemId = this.Config.BuffItemIds[this.buffIndex++];
-        int count = this.items.Count(itemId);
-        if (count <= 0)
-        {
-            this.cpLog.Info($"buff items: no #{itemId} in bags (AutoDuty must buy it from the shop list)");
-            return;
-        }
+            int count = this.items.Count(itemId);
+            if (count <= 0)
+            {
+                continue;
+            }
 
-        bool used = this.items.UseItem(itemId);
-        this.cpLog.Info($"buff items: use #{itemId} ({count} held) = {used}");
+            bool used = this.items.UseItem(itemId);
+            this.cpLog.Info($"buff items: use #{itemId} ({count} held) = {used}");
+            if (used)
+            {
+                this.buffUsed.Add(itemId);
+            }
+
+            return; // one per tick so the game can process the action
+        }
     }
-
     private void OnCommand(string command, string arguments)
     {
         var parts = arguments.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
