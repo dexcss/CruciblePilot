@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Command;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -19,11 +20,14 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ICommandManager commands;
     private readonly IChatGui chat;
     private readonly IPluginLog log;
+    private readonly IClientState clientState;
     private readonly IFramework framework;
     private readonly AutoDutyIpc autoDuty;
     private readonly AutoDutyTeam autoDutyTeam;
     private readonly EnemyIntel intel;
     private readonly FoodHelper food;
+    private readonly ItemHelper items;
+    private readonly ICondition condition;
     private readonly HornAutopilot horns;
     private readonly Ui ui;
     private readonly CpLog cpLog;
@@ -41,13 +45,15 @@ public sealed class Plugin : IDalamudPlugin
         IGameGui gameGui,
         IClientState clientState,
         IObjectTable objects,
-        IDataManager data)
+        IDataManager data,
+        ICondition condition)
     {
         Instance = this;
         this.pluginInterface = pluginInterface;
         this.commands = commands;
         this.chat = chat;
         this.log = log;
+        this.clientState = clientState;
         this.framework = framework;
 
         this.Config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
@@ -56,6 +62,8 @@ public sealed class Plugin : IDalamudPlugin
         this.autoDutyTeam = new AutoDutyTeam(log);
         this.intel = new EnemyIntel(objects, data, log);
         this.food = new FoodHelper(this, objects, data);
+        this.items = new ItemHelper(this, objects);
+        this.condition = condition;
 
         if (this.Config.Version < 2)
         {
@@ -146,6 +154,71 @@ public sealed class Plugin : IDalamudPlugin
     {
         this.horns.Tick();
         this.TickPendingStart();
+        this.TickCrucibleBuffs();
+    }
+
+    private int buffIndex;
+    private bool buffRoundDone;
+    private DateTime nextBuffTry = DateTime.MinValue;
+    private uint buffTerritory;
+
+    /// <summary>
+    /// Drinks the defensive Crucible consumables once per board entry: G2 Beastmaster Reraisser (95% auto-revive),
+    /// Temporal Sand (rewind to fight start on KO), Beast Potion Kit (auto-potion) and Beast Remedy Kit (auto-remedy).
+    /// They must be in hand, so this only works when AutoDuty has bought them from the shop list.
+    /// </summary>
+    private void TickCrucibleBuffs()
+    {
+        if (!this.Config.UseCrucibleBuffs)
+        {
+            return;
+        }
+
+        uint territory = this.clientState.TerritoryType;
+        if (territory is < 1339 or > 1343)
+        {
+            this.buffRoundDone = false;
+            this.buffIndex = 0;
+            this.buffTerritory = 0;
+            return;
+        }
+
+        if (this.buffTerritory != territory)
+        {
+            this.buffTerritory = territory;
+            this.buffRoundDone = false;
+            this.buffIndex = 0;
+            this.nextBuffTry = DateTime.MinValue;
+        }
+
+        if (this.buffRoundDone || DateTime.UtcNow < this.nextBuffTry)
+        {
+            return;
+        }
+
+        if (this.condition[ConditionFlag.InCombat])
+        {
+            return; // these are board consumables; drink them between fights
+        }
+
+        this.nextBuffTry = DateTime.UtcNow.AddSeconds(1);
+
+        if (this.buffIndex >= this.Config.BuffItemIds.Count)
+        {
+            this.buffRoundDone = true;
+            return;
+        }
+
+        uint itemId = this.Config.BuffItemIds[this.buffIndex++];
+        int count = this.items.Count(itemId);
+        if (count <= 0)
+        {
+            this.cpLog.Info($"buff items: no #{itemId} in bags (AutoDuty must buy it from the shop list)");
+            return;
+        }
+
+        bool used = this.items.UseItem(itemId);
+        this.cpLog.Info($"buff items: use #{itemId} ({count} held) = {used}");
     }
 
     private void OnCommand(string command, string arguments)

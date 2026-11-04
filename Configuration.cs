@@ -23,6 +23,12 @@ public sealed class Configuration : IPluginConfiguration
     public int Degree { get; set; } = 0;
 
     /// <summary>Clear mode brings a full roster and swaps per fight; score mode brings exactly three beasts for Beast Squad III and the no-shop/no-rest bonuses.</summary>
+    /// <summary>Drink defensive Crucible consumables (reraisser/sand/kits) between fights when held.</summary>
+    public bool UseCrucibleBuffs { get; set; } = true;
+
+    /// <summary>XBM item rows to use, in order: G2 Beastmaster Reraisser, Beast Potion Kit, Beast Remedy Kit, Temporal Sand.</summary>
+    public List<uint> BuffItemIds { get; set; } = new() { 99, 140, 141, 138 };
+
     public bool ScoreMode { get; set; }
 
     /// <summary>The three beasts used in score mode, per board (they must clear the whole board alone).</summary>
