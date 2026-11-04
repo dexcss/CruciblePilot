@@ -27,6 +27,8 @@ public sealed unsafe class HornAutopilot
     private string lastStageDumpSignature = string.Empty;
     private string lastEncounterSignature = string.Empty;
     private DateTime nextEncounterLog = DateTime.MinValue;
+    private int toggleCount;
+    private string toggleEncounter = string.Empty;
 
     public HornAutopilot(Plugin plugin, IPluginLog log, IGameGui gameGui, IClientState clientState)
     {
@@ -119,11 +121,46 @@ public sealed unsafe class HornAutopilot
 
         this.DumpStage(stage, enemies);
 
+        if (encounterSignature != this.toggleEncounter)
+        {
+            this.toggleEncounter = encounterSignature;
+            this.toggleCount = 0;
+        }
+
         var target = this.ResolveTrio(board, roster, enemies, weaknesses);
         if (target.Count != 3)
         {
             this.Warn("no trio could be resolved for this encounter - waiting (no fallback trio)");
             return;
+        }
+
+        // A KO'd familiar cannot be summoned again for the rest of the board; substitute instead of looping.
+        var alive = rows.Where(r => r.MaxHp == 0 || r.Hp != 0).ToList();
+        var aliveNumbers = alive.Select(r => r.Number).ToHashSet();
+        if (target.Any(t => !aliveNumbers.Contains(t)))
+        {
+            var substituted = target.Where(aliveNumbers.Contains).ToList();
+            foreach (var row in alive.OrderByDescending(r => r.Hp).ThenBy(r => r.Number))
+            {
+                if (substituted.Count >= 3)
+                {
+                    break;
+                }
+
+                if (!substituted.Contains(row.Number))
+                {
+                    substituted.Add(row.Number);
+                }
+            }
+
+            this.plugin.CpLog.Info("KO substitution: [" + string.Join(",", target) + "] -> [" + string.Join(",", substituted) +
+                                   "] (dead: " + string.Join(",", target.Where(t => !aliveNumbers.Contains(t))) + ")");
+            target = substituted;
+            if (target.Count != 3)
+            {
+                this.Warn("not enough living familiars left for three horns");
+                return;
+            }
         }
 
         var missing = target.Where(t => !roster.Contains(t)).ToList();
@@ -154,6 +191,23 @@ public sealed unsafe class HornAutopilot
                 this.log.Information($"[CP] Trio ({string.Join(",", target)}) on the horns - starting the fight");
                 this.plugin.CpLog.Info($"starting fight with {string.Join(",", target)}" +
                                        (enforceOrder ? $" (horn order {string.Join(" | ", target)})" : string.Empty));
+            }
+
+            return;
+        }
+
+        if (this.toggleCount > 40)
+        {
+            if (selected.Count == 3)
+            {
+                this.Warn("horn order could not settle - starting with the three selected beasts");
+                this.Fire(stage, 8);
+                this.lastConfirm = DateTime.UtcNow;
+            }
+            else if (DateTime.UtcNow > this.nextEncounterLog)
+            {
+                this.Warn("horn assignment is not settling - waiting");
+                this.nextEncounterLog = DateTime.UtcNow.AddSeconds(5);
             }
 
             return;
@@ -205,6 +259,7 @@ public sealed unsafe class HornAutopilot
     {
         this.Fire(party, 1, row.Index);
         this.nextAction = DateTime.UtcNow.AddMilliseconds(350);
+        this.toggleCount++;
         this.log.Debug($"[CP] Toggle familiar #{row.Number} (row {row.Index}, selection {row.Selection})");
         this.plugin.CpLog.Info($"toggle #{row.Number} row {row.Index} (was sel {row.Selection})");
     }
