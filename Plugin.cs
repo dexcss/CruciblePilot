@@ -65,10 +65,10 @@ public sealed class Plugin : IDalamudPlugin
         this.items = new ItemHelper(this, objects);
         this.condition = condition;
 
-        if (this.Config.Version < 3)
+        if (this.Config.Version < 4)
         {
             this.Config.BoardRosters = CrucibleData.DefaultRosters();
-            this.Config.Version = 3;
+            this.Config.Version = 4;
             pluginInterface.SavePluginConfig(this.Config);
             log.Information("[CP] migrated config to v2: per-board rosters reset to the curated defaults");
         }
@@ -193,7 +193,7 @@ public sealed class Plugin : IDalamudPlugin
             return; // these are board consumables; drink them between fights
         }
 
-        this.nextBuffTry = DateTime.UtcNow.AddSeconds(2);
+        this.nextBuffTry = DateTime.UtcNow.AddSeconds(3);
 
         foreach (uint itemId in this.Config.BuffItemIds)
         {
@@ -202,14 +202,11 @@ public sealed class Plugin : IDalamudPlugin
                 continue;
             }
 
+            // Crucible items live outside the normal inventory, so the count can read 0 even when held;
+            // just try the item action and let the game refuse it when it is not there.
             int count = this.items.Count(itemId);
-            if (count <= 0)
-            {
-                continue;
-            }
-
             bool used = this.items.UseItem(itemId);
-            this.cpLog.Info($"buff items: use #{itemId} ({count} held) = {used}");
+            this.cpLog.Info($"buff items: use #{itemId} (inventory count {count}) = {used}");
             if (used)
             {
                 this.buffUsed.Add(itemId);

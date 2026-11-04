@@ -78,7 +78,7 @@ public static class CrucibleData
     /// <summary>Rosters sized to each board's cap, covering every trio above.</summary>
     public static Dictionary<int, List<uint>> DefaultRosters() => new()
     {
-        [1] = new() { 29, 20, 48, 1, 7, 21, 4, 11, 13, 5 },
+        [1] = new() { 20, 21, 48, 4, 11, 44, 1, 5, 7, 13 },
         [2] = new() { 29, 20, 48, 1, 7, 21, 4, 11, 13, 5, 26, 36 },
         [3] = new() { 50, 31, 48, 36, 21, 4, 11, 23, 13, 5, 34, 29, 10, 26 },
         [4] = new() { 50, 31, 48, 36, 21, 4, 11, 23, 13, 5, 34, 16 },
