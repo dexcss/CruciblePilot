@@ -26,6 +26,11 @@ public sealed class WhistleHelper
     private readonly IClientState clientState;
     private readonly IGameGui gameGui;
     private DateTime nextTry = DateTime.MinValue;
+
+    /// <summary>Timestamp of the last successful Tempered Release, used by the combat loop to fire the finisher.</summary>
+    public static DateTime LastReleaseAt { get; private set; } = DateTime.MinValue;
+
+    public static void ClearRelease() => LastReleaseAt = DateTime.MinValue;
     private int activeHorn = -1;
     private bool hudDumped;
 
@@ -140,21 +145,24 @@ public sealed class WhistleHelper
 
         if (hpPercent > threshold)
         {
-            // The finisher is a 30s-cooldown pet nuke, not a one-shot: keep it rolling on cooldown while the
-            // familiar is empowered, and only use the threshold to decide when it is worth holding.
-            if (actionManager->GetActionStatus(ActionType.Action, TemperedRelease) == 0 &&
-                actionManager->UseAction(ActionType.Action, TemperedRelease, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
+            // Tempered Release is a 30s pet nuke (current id 47092, reached through the adjusted-action lookup).
+            uint releaseOnCooldown = actionManager->GetAdjustedActionId(TemperedRelease);
+            if (actionManager->GetActionStatus(ActionType.Action, releaseOnCooldown) == 0 &&
+                actionManager->UseAction(ActionType.Action, releaseOnCooldown, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
-                this.plugin.CpLog.Info($"whistle: tempered release on cooldown at target {hpPercent:F0}%");
+                LastReleaseAt = DateTime.UtcNow;
+                this.plugin.CpLog.Info($"whistle: tempered release on cooldown at target {hpPercent:F0}% (id {releaseOnCooldown})");
             }
 
             return;
         }
 
-        if (actionManager->GetActionStatus(ActionType.Action, TemperedRelease) == 0 &&
-            actionManager->UseAction(ActionType.Action, TemperedRelease, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
+        uint releaseAtThreshold = actionManager->GetAdjustedActionId(TemperedRelease);
+        if (actionManager->GetActionStatus(ActionType.Action, releaseAtThreshold) == 0 &&
+            actionManager->UseAction(ActionType.Action, releaseAtThreshold, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
-            this.plugin.CpLog.Info($"whistle: horn {(slot < 0 ? 0 : slot + 1)} tempered release at target {hpPercent:F0}% (threshold {threshold}%)");
+            LastReleaseAt = DateTime.UtcNow;
+            this.plugin.CpLog.Info($"whistle: horn {(slot < 0 ? 0 : slot + 1)} tempered release at target {hpPercent:F0}% (threshold {threshold}%, id {releaseAtThreshold})");
         }
     }
 

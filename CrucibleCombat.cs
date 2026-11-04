@@ -38,6 +38,7 @@ public sealed class CrucibleCombat
     private const uint Rally = 44905;
     private const uint Burst = 44930;
     private const uint Trick = 47093;
+    private const uint Snarl = 46751;
 
     private static readonly uint[] Horns = { FirstHorn, SecondHorn, ThirdHorn };
     private static readonly uint[] FightPotions = { 79, 78, 77, 76, 82, 81, 80 };
@@ -194,9 +195,15 @@ public sealed class CrucibleCombat
             return;
         }
 
-        // Pet-skill finisher: Parting Blow while the familiar is finishing its own ability.
-        if (this.plugin.Config.CombatPetFinisher && this.TryPetFinisher(actionManager, player))
+        // Horn finisher, following the ACR plan: after Tempered Release lands for the current horn, Parting Blow
+        // sends the familiar away (that is the "收尾" step) and only then is the next horn summoned.
+        if (this.plugin.Config.CombatPetFinisher && this.HasFamiliar(player) &&
+            DateTime.UtcNow - WhistleHelper.LastReleaseAt < TimeSpan.FromSeconds(2) &&
+            actionManager->GetActionStatus(ActionType.Action, PartingBlow) == 0 &&
+            actionManager->UseAction(ActionType.Action, PartingBlow, target!.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
+            WhistleHelper.ClearRelease();
+            this.plugin.CpLog.Info("combat: parting blow finisher (familiar retreats, next horn follows)");
             return;
         }
 
@@ -255,6 +262,15 @@ public sealed class CrucibleCombat
             actionManager->UseAction(ActionType.Action, Capture, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
             this.plugin.CpLog.Info("combat: capture");
+            return;
+        }
+
+        // Snarl (46751): the boss is hitting us, push the aggro back onto the familiar so it tanks.
+        if (target.TargetObjectId == player.GameObjectId &&
+            actionManager->GetActionStatus(ActionType.Action, Snarl) == 0 &&
+            actionManager->UseAction(ActionType.Action, Snarl, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
+        {
+            this.plugin.CpLog.Info("combat: snarl (aggro back to pet)");
             return;
         }
 

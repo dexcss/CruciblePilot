@@ -26,7 +26,7 @@ public sealed class Configuration : IPluginConfiguration
     public bool CombatCountdownOpener { get; set; } = true;
 
     /// <summary>Parting Blow while the familiar is finishing its own ability.</summary>
-    public bool CombatPetFinisher { get; set; } = true;
+    public bool CombatPetFinisher { get; set; }
 
     /// <summary>Use the ranged fallback action when the target is out of melee reach.</summary>
     public bool CombatRangedFallback { get; set; } = true;
