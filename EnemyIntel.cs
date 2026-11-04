@@ -117,6 +117,7 @@ public sealed class EnemyIntel
     private readonly IDataManager data;
     private readonly IPluginLog log;
     private Dictionary<uint, BeastProfile>? profiles;
+    private HashSet<string>? beastNames;
 
     public EnemyIntel(IObjectTable objects, IDataManager data, IPluginLog log)
     {
@@ -231,6 +232,12 @@ public sealed class EnemyIntel
 
             string name = npc.Name.TextValue;
             if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            this.beastNames ??= this.Profiles().Values.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (this.beastNames.Contains(name.Trim()))
             {
                 continue;
             }

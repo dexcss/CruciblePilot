@@ -117,7 +117,7 @@ public sealed unsafe class HornAutopilot
 
         this.DumpStage(stage, enemies);
 
-        var target = this.ResolveTrio(board, roster);
+        var target = this.ResolveTrio(board, roster, enemies);
         if (target.Count != 3)
         {
             var fallback = rows.Where(r => r.MaxHp == 0 || r.Hp != 0).Select(r => r.Number).Distinct().Take(3).ToList();
@@ -221,7 +221,7 @@ public sealed unsafe class HornAutopilot
     private List<uint> cachedPick = new();
 
     /// <summary>Resolve the trio for the encounter currently being set up (recomputed only when the enemy set changes).</summary>
-    private List<uint> ResolveTrio(int board, HashSet<uint> roster)
+    private List<uint> ResolveTrio(int board, HashSet<uint> roster, IReadOnlyList<string> enemies)
     {
         var fixedTrio = this.plugin.Config.Trio(board);
         if (!this.plugin.Config.AutoPick)
@@ -229,7 +229,6 @@ public sealed unsafe class HornAutopilot
             return fixedTrio;
         }
 
-        var enemies = this.plugin.Intel.CurrentEnemies();
         string signature = string.Join("|", enemies.OrderBy(e => e, StringComparer.OrdinalIgnoreCase));
         if (signature == this.lastEnemySignature && this.cachedPick.Count == 3 && this.cachedPick.All(roster.Contains))
         {
