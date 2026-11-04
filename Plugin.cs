@@ -29,6 +29,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ItemHelper items;
     private readonly ICondition condition;
     private readonly HornAutopilot horns;
+    private readonly DegreeHelper degree;
     private readonly Ui ui;
     private readonly CpLog cpLog;
     private bool pushedOverrides;
@@ -73,6 +74,7 @@ public sealed class Plugin : IDalamudPlugin
             log.Information("[CP] migrated config to v2: per-board rosters reset to the curated defaults");
         }
         this.horns = new HornAutopilot(this, log, gameGui, clientState);
+        this.degree = new DegreeHelper(this, gameGui, clientState);
         this.ui = new Ui(this);
 
         this.commands.AddHandler(CommandName, new CommandInfo(this.OnCommand)
@@ -153,6 +155,7 @@ public sealed class Plugin : IDalamudPlugin
     private void OnFrameworkUpdate(IFramework fw)
     {
         this.horns.Tick();
+        this.degree.Tick();
         this.TickPendingStart();
         this.TickCrucibleBuffs();
     }

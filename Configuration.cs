@@ -28,6 +28,9 @@ public sealed class Configuration : IPluginConfiguration
     /// </summary>
     public bool MetaTrioMode { get; set; } = true;
 
+    /// <summary>Force the Crucible Mode (degree) on the pre-battle window, for runs driven by another plugin (Pawprint).</summary>
+    public bool ForceDegree { get; set; } = true;
+
     /// <summary>Per-board meta trios taken from those presets.</summary>
     public Dictionary<int, List<uint>> MetaTrios { get; set; } = new()
     {
