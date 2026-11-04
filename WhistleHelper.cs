@@ -67,7 +67,7 @@ public sealed class WhistleHelper
             if (gaugeSlot >= 0 && gaugeSlot <= 2 && gaugeSlot != this.activeHorn)
             {
                 this.activeHorn = gaugeSlot;
-                this.plugin.CpLog.Info($"whistle: horn slot {gaugeSlot + 1} active (gauge) tp={gauge.TpGauge} petTp={gauge.PetTpGauge} soul={gauge.SoulStacks} power={gauge.BeastPower} whistle={gauge.WhistleIndex} heart={gauge.HeartStacks}");
+                this.plugin.CpLog.Info($"whistle: horn slot {gaugeSlot + 1} active (gauge) tp={gauge.Tp} power={gauge.BeastPower} whistle={gauge.WhistleIndex} heart={gauge.BeastHeart}");
             }
         }
 

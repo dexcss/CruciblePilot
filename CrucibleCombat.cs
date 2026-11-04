@@ -307,19 +307,19 @@ public sealed class CrucibleCombat
 
         if (BeastGauge.TryRead(out var gauge))
         {
-            if (gauge.SoulStacks > 0 &&
+            if (gauge.BeastPower > 0 &&
                 actionManager->GetActionStatus(ActionType.Action, RallyingCheer) == 0 &&
                 actionManager->UseAction(ActionType.Action, RallyingCheer, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
-                this.plugin.CpLog.Info($"combat: ogcd cheer (natural {gauge.SoulStacks})");
+                this.plugin.CpLog.Info($"combat: ogcd cheer (natural {gauge.BeastPower})");
                 return;
             }
 
-            if (gauge.HeartStacks > 0 &&
+            if (gauge.BeastHeart > 0 &&
                 actionManager->GetActionStatus(ActionType.Action, Rally) == 0 &&
                 actionManager->UseAction(ActionType.Action, Rally, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
-                this.plugin.CpLog.Info($"combat: ogcd rally (mastered {gauge.HeartStacks})");
+                this.plugin.CpLog.Info($"combat: ogcd rally (mastered {gauge.BeastHeart})");
                 return;
             }
         }
@@ -457,9 +457,12 @@ public sealed class CrucibleCombat
 
     private unsafe uint PickGcd(ActionManager* actionManager, IPlayerCharacter player)
     {
-        // The gauge offsets are not reliable on every client build, so the resource gates are left to the game:
-        // GetActionStatus already refuses actions when TP / beast power requirements are unmet.
-        if (this.plugin.Config.CombatBurst)
+        bool hasGauge = BeastGauge.TryRead(out var gauge);
+        bool burstReady = hasGauge && gauge.Tp >= 250;
+        bool comboReady = hasGauge && gauge.Tp >= 100 && gauge.BeastPower >= 100;
+
+        // Burst needs 250 TP and one of the burst statuses (4599 Sunstrider / 4600 Moonstalker).
+        if (this.plugin.Config.CombatBurst && burstReady)
         {
             uint burst = HasStatus(player, 4599) ? 44931u : HasStatus(player, 4600) ? 44930u : 0u;
             if (burst != 0 && actionManager->GetActionStatus(ActionType.Action, burst) == 0)
@@ -468,12 +471,15 @@ public sealed class CrucibleCombat
             }
         }
 
-        // Attribute axes in cycle order; use whichever is off cooldown.
-        foreach (uint axe in new[] { AttributeAxe(player), AvalancheAxe, MistralAxe, SpinningAxe, GaleAxe })
+        // Axe combo needs 100 beast power and 100 TP; cycle the attribute axes.
+        if (!hasGauge || comboReady)
         {
-            if (axe != 0 && actionManager->GetActionStatus(ActionType.Action, axe) == 0)
+            foreach (uint axe in new[] { AttributeAxe(player), AvalancheAxe, MistralAxe, SpinningAxe, GaleAxe })
             {
-                return axe;
+                if (axe != 0 && actionManager->GetActionStatus(ActionType.Action, axe) == 0)
+                {
+                    return axe;
+                }
             }
         }
 
@@ -558,7 +564,7 @@ public sealed class CrucibleCombat
         {
             var pets = this.objects.OfType<IBattleNpc>().Where(n => n.OwnerId != 0).Select(n => $"{n.Name}#{n.BaseId}/owner={n.OwnerId:X}/hp={n.CurrentHp}").Take(6);
             string gaugeText = BeastGauge.TryRead(out var g)
-                ? $"tp={g.TpGauge} petTp={g.PetTpGauge} soul={g.SoulStacks} power={g.BeastPower} whistle={g.WhistleIndex} heart={g.HeartStacks} horn={g.ActiveBattlehorn}"
+                ? $"tp={g.Tp} power={g.BeastPower} whistle={g.WhistleIndex} heart={g.BeastHeart} raw=[{BeastGauge.RawHex()}]"
                 : "gauge?";
             int hpPercent = player.MaxHp == 0 ? 0 : (int)(player.CurrentHp * 100 / player.MaxHp);
             this.plugin.CpLog.Info($"combat diag: hp={hpPercent}% player={player.GameObjectId:X} pets=[" + string.Join(", ", pets) + "] " + gaugeText);
