@@ -25,6 +25,8 @@ public sealed unsafe class HornAutopilot
     private DateTime lastWarnAt = DateTime.MinValue;
     private string lastRosterSignature = string.Empty;
     private string lastStageDumpSignature = string.Empty;
+    private string lastEncounterSignature = string.Empty;
+    private DateTime nextEncounterLog = DateTime.MinValue;
 
     public HornAutopilot(Plugin plugin, IPluginLog log, IGameGui gameGui, IClientState clientState)
     {
@@ -97,17 +99,31 @@ public sealed unsafe class HornAutopilot
 
         var roster = rows.Select(r => r.Number).ToHashSet();
         var enemies = this.plugin.Intel.CurrentEnemies();
-        this.plugin.CpLog.Info("horn setup: enemies " + (enemies.Count == 0 ? "(none)" : "[" + string.Join(", ", enemies) + "]") +
-                               " roster [" + string.Join(", ", rows.Select(r => r.Number)) + "]");
+        var stageText = ReadStageStrings(stage);
+        if (enemies.Count == 0 && stageText.Count > 0)
+        {
+            // The arena's actors only spawn after the battle starts; the stage window already lists them.
+            enemies = stageText;
+        }
+
+        string encounterSignature = string.Join("|", enemies) + "#" + rosterSignature;
+        if (encounterSignature != this.lastEncounterSignature && DateTime.UtcNow > this.nextEncounterLog)
+        {
+            this.lastEncounterSignature = encounterSignature;
+            this.nextEncounterLog = DateTime.UtcNow.AddSeconds(3);
+            this.plugin.CpLog.Info("horn setup: enemies " + (enemies.Count == 0 ? "(none)" : "[" + string.Join(", ", enemies) + "]") +
+                                   " roster [" + string.Join(", ", rows.Select(r => r.Number)) + "]");
+        }
+
         this.DumpStage(stage, enemies);
 
         var target = this.ResolveTrio(board, roster);
-        if (target.Count == 0)
+        if (target.Count != 3)
         {
             var fallback = rows.Where(r => r.MaxHp == 0 || r.Hp != 0).Select(r => r.Number).Distinct().Take(3).ToList();
             if (fallback.Count == 3)
             {
-                this.Warn("no enemies/default matched - starting with the first three roster beasts");
+                this.Warn($"no complete trio resolved ({target.Count} beasts) - using the first three roster beasts");
                 target = fallback;
             }
             else
@@ -258,11 +274,43 @@ public sealed unsafe class HornAutopilot
         return picks;
     }
 
+    /// <summary>Texts shown in the stage window (it lists the encounter's enemies before the battle starts).</summary>
+    private static List<string> ReadStageStrings(AtkUnitBase* stage)
+    {
+        var list = new List<string>();
+        try
+        {
+            int count = Math.Min((int)stage->AtkValuesCount, 200);
+            for (int i = 0; i < count; i++)
+            {
+                var value = stage->AtkValues[i];
+                if (value.Type is not (AtkValueType.String or AtkValueType.ConstString) || !value.String.HasValue)
+                {
+                    continue;
+                }
+
+                string text = (string)value.String;
+                if (string.IsNullOrWhiteSpace(text) || text.Length > 80 || list.Contains(text))
+                {
+                    continue;
+                }
+
+                list.Add(text.Trim());
+            }
+        }
+        catch
+        {
+            // stage values change while it populates; ignore a partial read
+        }
+
+        return list;
+    }
+
     /// <summary>Log the stage-detail addon's values once per enemy set (helps map the encounter data).</summary>
     private void DumpStage(AtkUnitBase* stage, IReadOnlyList<string> enemies)
     {
         string signature = string.Join("|", enemies);
-        if (signature == this.lastStageDumpSignature)
+        if (signature.Length > 0 && signature == this.lastStageDumpSignature)
         {
             return;
         }
