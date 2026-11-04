@@ -11,13 +11,13 @@ public sealed class Configuration : IPluginConfiguration
     public int Version { get; set; } = 5;
 
     /// <summary>Crucible Mode to force on the pre-battle window (1 = First, 2 = Second, 3 = Third).</summary>
-    public int Degree { get; set; } = 3;
+    public int Degree { get; set; } = 1;
 
     /// <summary>Keep forcing the degree on every stage window.</summary>
     public bool ForceDegree { get; set; } = true;
 
     /// <summary>Run the ACR resolvers directly through the bridge (their compiled logic, our tick and submission).</summary>
-    public bool UseXszyysBridge { get; set; } = true;
+    public bool UseXszyysBridge { get; set; }
 
     /// <summary>Run the built-in Beastmaster Crucible rotation (turn RSR off for Beastmaster).</summary>
     public bool EnableCombat { get; set; } = true;
