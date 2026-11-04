@@ -185,7 +185,7 @@ public sealed class CrucibleCombat
         // Downtime axe: no enemy to hit, so spend the TP on Avalanche Axe when it is ready.
         if (target == null)
         {
-            if (this.plugin.Config.CombatDowntimeAxe &&
+            if (this.plugin.Config.CombatDowntimeAxe && BeastGauge.TryRead(out var downtimeGauge) && downtimeGauge.Tp >= 100 &&
                 actionManager->GetActionStatus(ActionType.Action, AvalancheAxe) == 0 &&
                 actionManager->UseAction(ActionType.Action, AvalancheAxe, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
@@ -323,7 +323,7 @@ public sealed class CrucibleCombat
 
         if (BeastGauge.TryRead(out var gauge))
         {
-            if (gauge.BeastPower > 0 &&
+            if (gauge.BeastPower >= 100 &&
                 actionManager->GetActionStatus(ActionType.Action, RallyingCheer) == 0 &&
                 actionManager->UseAction(ActionType.Action, RallyingCheer, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
@@ -331,7 +331,7 @@ public sealed class CrucibleCombat
                 return;
             }
 
-            if (gauge.BeastHeart > 0 &&
+            if (gauge.BeastHeart >= 3 &&
                 actionManager->GetActionStatus(ActionType.Action, Rally) == 0 &&
                 actionManager->UseAction(ActionType.Action, Rally, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
