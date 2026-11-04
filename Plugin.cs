@@ -84,6 +84,8 @@ public sealed class Plugin : IDalamudPlugin
 
     public Configuration Config { get; }
 
+    public IObjectTable Objects { get; }
+
     public EnemyIntel Intel => this.intel;
 
     public CpLog CpLog => this.cpLog;

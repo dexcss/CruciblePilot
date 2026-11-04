@@ -68,7 +68,9 @@ public sealed unsafe class HornAutopilot
             {
                 this.nextHeartbeat = DateTime.UtcNow.AddSeconds(10);
                 var idleEnemies = this.plugin.Intel.CurrentEnemies();
-                this.plugin.CpLog.Info($"heartbeat board {board}: party={partyOpen} stage={stageOpen} enemies={idleEnemies.Count} [{string.Join(", ", idleEnemies)}]");
+                var player = this.plugin.Objects.LocalPlayer;
+                string hp = player == null ? "?" : $"{player.CurrentHp}/{player.MaxHp}";
+                this.plugin.CpLog.Info($"heartbeat board {board}: party={partyOpen} stage={stageOpen} enemies={idleEnemies.Count} [{string.Join(", ", idleEnemies)}] playerHp={hp}");
             }
 
             return;
