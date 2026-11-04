@@ -122,7 +122,7 @@ public sealed class WhistleHelper
             }
 
             if (actionManager->GetActionStatus(ActionType.Action, Borrow) == 0 &&
-                actionManager->UseAction(ActionType.Action, Borrow, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+                actionManager->UseAction(ActionType.Action, Borrow, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
                 this.plugin.CpLog.Info($"whistle: horn 3 borrow at target {hpPercent:F0}%");
             }
@@ -136,7 +136,7 @@ public sealed class WhistleHelper
         }
 
         if (actionManager->GetActionStatus(ActionType.Action, TemperedRelease) == 0 &&
-            actionManager->UseAction(ActionType.Action, TemperedRelease, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            actionManager->UseAction(ActionType.Action, TemperedRelease, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
             this.plugin.CpLog.Info($"whistle: horn {(slot < 0 ? 0 : slot + 1)} tempered release at target {hpPercent:F0}% (threshold {threshold}%)");
         }

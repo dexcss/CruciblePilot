@@ -149,6 +149,11 @@ public sealed class CrucibleCombat
         bool canGcd = animationLock <= 0f && gcdRemain <= 0.3f;
         bool canOffGcd = animationLock <= 0f && gcdRemain > 0.6f;
 
+        if (player.IsCasting)
+        {
+            return;
+        }
+
         var target = this.EnsureTarget();
 
         // Downtime axe: no enemy to hit, so spend the TP on Avalanche Axe when it is ready.
@@ -156,7 +161,7 @@ public sealed class CrucibleCombat
         {
             if (this.plugin.Config.CombatDowntimeAxe &&
                 actionManager->GetActionStatus(ActionType.Action, AvalancheAxe) == 0 &&
-                actionManager->UseAction(ActionType.Action, AvalancheAxe, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+                actionManager->UseAction(ActionType.Action, AvalancheAxe, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
                 this.plugin.CpLog.Info("combat: downtime avalanche axe");
             }
@@ -199,7 +204,7 @@ public sealed class CrucibleCombat
             {
                 uint horn = Horns[this.hornStage % Horns.Length];
                 if (actionManager->GetActionStatus(ActionType.Action, horn) == 0 &&
-                    actionManager->UseAction(ActionType.Action, horn, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+                    actionManager->UseAction(ActionType.Action, horn, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
                 {
                     this.plugin.CpLog.Info($"combat: casting horn {(this.hornStage % Horns.Length) + 1}");
                     this.pendingHornSlot = this.hornStage % Horns.Length;
@@ -213,7 +218,7 @@ public sealed class CrucibleCombat
         float distance = Distance(player.Position, target.Position);
         if (this.plugin.Config.CombatRangedFallback && distance > 3.5f &&
             actionManager->GetActionStatus(ActionType.Action, RangedFallback) == 0 &&
-            actionManager->UseAction(ActionType.Action, RangedFallback, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            actionManager->UseAction(ActionType.Action, RangedFallback, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
             this.plugin.CpLog.Info($"combat: ranged fallback at {distance:F1}m");
             return;
@@ -222,7 +227,7 @@ public sealed class CrucibleCombat
         // Capture marks the target for the capture mechanic (off by default).
         if (this.plugin.Config.CombatCapture &&
             actionManager->GetActionStatus(ActionType.Action, Capture) == 0 &&
-            actionManager->UseAction(ActionType.Action, Capture, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            actionManager->UseAction(ActionType.Action, Capture, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
             this.plugin.CpLog.Info("combat: capture");
             return;
@@ -238,7 +243,7 @@ public sealed class CrucibleCombat
 
             uint earlyGcd = this.PickGcd(actionManager);
             if (earlyGcd != 0 &&
-                actionManager->UseAction(ActionType.Action, earlyGcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+                actionManager->UseAction(ActionType.Action, earlyGcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
                 this.comboAt = DateTime.UtcNow;
                 this.plugin.CpLog.Info($"combat: gcd {earlyGcd}");
@@ -254,7 +259,7 @@ public sealed class CrucibleCombat
         }
 
         if (actionManager->GetActionStatus(ActionType.Action, ShieldCharge) == 0 &&
-            actionManager->UseAction(ActionType.Action, ShieldCharge, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            actionManager->UseAction(ActionType.Action, ShieldCharge, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
             this.plugin.CpLog.Info("combat: ogcd shield charge");
             return;
@@ -262,14 +267,14 @@ public sealed class CrucibleCombat
 
         if (this.HasFamiliar(player) &&
             actionManager->GetActionStatus(ActionType.Action, Borrow) == 0 &&
-            actionManager->UseAction(ActionType.Action, Borrow, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            actionManager->UseAction(ActionType.Action, Borrow, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
             this.plugin.CpLog.Info("combat: ogcd borrow");
             return;
         }
 
         if (actionManager->GetActionStatus(ActionType.Action, BeastMode) == 0 &&
-            actionManager->UseAction(ActionType.Action, BeastMode, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            actionManager->UseAction(ActionType.Action, BeastMode, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
             this.plugin.CpLog.Info("combat: ogcd beast mode");
             return;
@@ -279,7 +284,7 @@ public sealed class CrucibleCombat
         {
             if (gauge.SoulStacks > 0 &&
                 actionManager->GetActionStatus(ActionType.Action, RallyingCheer) == 0 &&
-                actionManager->UseAction(ActionType.Action, RallyingCheer, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+                actionManager->UseAction(ActionType.Action, RallyingCheer, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
                 this.plugin.CpLog.Info($"combat: ogcd cheer (natural {gauge.SoulStacks})");
                 return;
@@ -287,7 +292,7 @@ public sealed class CrucibleCombat
 
             if (gauge.HeartStacks > 0 &&
                 actionManager->GetActionStatus(ActionType.Action, Rally) == 0 &&
-                actionManager->UseAction(ActionType.Action, Rally, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+                actionManager->UseAction(ActionType.Action, Rally, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
                 this.plugin.CpLog.Info($"combat: ogcd rally (mastered {gauge.HeartStacks})");
                 return;
@@ -297,7 +302,7 @@ public sealed class CrucibleCombat
         foreach (uint ogcd in new[] { Burst, Trick, PartingBlow })
         {
             if (actionManager->GetActionStatus(ActionType.Action, ogcd) == 0 &&
-                actionManager->UseAction(ActionType.Action, ogcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+                actionManager->UseAction(ActionType.Action, ogcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
             {
                 this.plugin.CpLog.Info($"combat: ogcd {ogcd}");
                 return;
@@ -312,7 +317,7 @@ public sealed class CrucibleCombat
 
         uint gcd = this.PickGcd(actionManager);
         if (gcd != 0 &&
-            actionManager->UseAction(ActionType.Action, gcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            actionManager->UseAction(ActionType.Action, gcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
             this.comboAt = DateTime.UtcNow;
             this.plugin.CpLog.Info($"combat: gcd {gcd}");
@@ -404,7 +409,7 @@ public sealed class CrucibleCombat
             return false;
         }
 
-        if (actionManager->UseAction(ActionType.Action, PartingBlow, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+        if (actionManager->UseAction(ActionType.Action, PartingBlow, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
             this.plugin.CpLog.Info($"combat: pet finisher parting blow (pet cast {pet.CastActionId}, {remaining:F1}s left, lv{pet.Level})");
             return true;
@@ -415,7 +420,7 @@ public sealed class CrucibleCombat
 
     private unsafe bool Use(ActionManager* actionManager, uint action, ulong targetId)
         => actionManager->GetActionStatus(ActionType.Action, action) == 0 &&
-           actionManager->UseAction(ActionType.Action, action, targetId, 0xFFFF, ActionManager.UseActionMode.None, 0, null);
+           actionManager->UseAction(ActionType.Action, action, targetId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null);
 
     private unsafe uint PickGcd(ActionManager* actionManager)
     {
