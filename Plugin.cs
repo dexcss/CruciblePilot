@@ -23,6 +23,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly AutoDutyIpc autoDuty;
     private readonly AutoDutyTeam autoDutyTeam;
     private readonly EnemyIntel intel;
+    private readonly FoodHelper food;
     private readonly HornAutopilot horns;
     private readonly Ui ui;
     private readonly CpLog cpLog;
@@ -51,6 +52,7 @@ public sealed class Plugin : IDalamudPlugin
         this.autoDuty = new AutoDutyIpc(pluginInterface, log);
         this.autoDutyTeam = new AutoDutyTeam(log);
         this.intel = new EnemyIntel(objects, data, log);
+        this.food = new FoodHelper(this, objects);
         this.horns = new HornAutopilot(this, log, gameGui, clientState);
         this.ui = new Ui(this);
 
@@ -319,6 +321,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        this.food.EnsureFood(this.Config);
         this.cpLog.Info("run: board=" + this.Config.Board + " degree=" + Configuration.DegreeName(this.Config.Degree) + " roster=[" + string.Join(",", roster) + "]");
         if (this.Config.SetAutoDutyTeam)
         {

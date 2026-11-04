@@ -49,7 +49,13 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Pick the trio from the enemies currently in the arena instead of the fixed list.</summary>
     public bool AutoPick { get; set; } = true;
 
-    /// <summary>Prefer the curated per-encounter trio table over the live sheet scorer.</summary>
+    /// <summary>Eat the configured food before a run when the Well Fed buff is missing.</summary>
+    public bool EatFood { get; set; } = true;
+
+    /// <summary>Food item the plugin asks the game to use.</summary>
+    public string FoodItemName { get; set; } = "Rock-fisted Popoto Stew";
+
+    /// <summary>Prefer the curated per-encounter trio table over the weakness scoring.</summary>
     public bool UseDefaults { get; set; } = true;
 
     /// <summary>Whether the settings window is shown.</summary>

@@ -356,6 +356,51 @@ public sealed class EnemyIntel
         return picks.Select(p => p.Number).ToList();
     }
 
+    /// <summary>Pick three from the roster by how well their element/attack type matches the shown weaknesses.</summary>
+    public List<uint> PickFromTags(IReadOnlyList<uint> roster, IReadOnlyCollection<string> tags, out string reason)
+    {
+        var profiles = this.Profiles();
+        var scored = new List<(uint Number, int Score, string Why)>();
+        foreach (uint number in roster)
+        {
+            if (!profiles.TryGetValue(number, out var profile))
+            {
+                continue;
+            }
+
+            int score = 0;
+            var why = new List<string>();
+            if (profile.Element.Length > 0 && tags.Contains(profile.Element))
+            {
+                score += 3;
+                why.Add(profile.Element);
+            }
+
+            if (profile.DamageType.Length > 0 && tags.Contains(profile.DamageType))
+            {
+                score += 3;
+                why.Add(profile.DamageType);
+            }
+
+            scored.Add((number, score, string.Join("+", why)));
+        }
+
+        if (scored.Count < 3)
+        {
+            reason = "not enough familiar profiles";
+            return new List<uint>();
+        }
+
+        var picks = scored
+            .OrderByDescending(s => s.Score)
+            .ThenBy(s => profiles[s.Number].Name)
+            .Take(3)
+            .ToList();
+
+        reason = string.Join(", ", picks.Select(p => $"#{p.Number} {p.Why} ({p.Score})"));
+        return picks.Select(p => p.Number).ToList();
+    }
+
     public string DescribeProfiles(IEnumerable<uint> numbers)
     {
         var profiles = this.Profiles();

@@ -106,31 +106,24 @@ public sealed unsafe class HornAutopilot
             enemies = stageText;
         }
 
+        var weaknesses = ExtractWeaknesses(stageText);
+
         string encounterSignature = string.Join("|", enemies) + "#" + rosterSignature;
         if (encounterSignature != this.lastEncounterSignature && DateTime.UtcNow > this.nextEncounterLog)
         {
             this.lastEncounterSignature = encounterSignature;
             this.nextEncounterLog = DateTime.UtcNow.AddSeconds(3);
             this.plugin.CpLog.Info("horn setup: enemies " + (enemies.Count == 0 ? "(none)" : "[" + string.Join(", ", enemies) + "]") +
-                                   " roster [" + string.Join(", ", rows.Select(r => r.Number)) + "]");
+                                   " weaknesses [" + string.Join(",", weaknesses) + "] roster [" + string.Join(", ", rows.Select(r => r.Number)) + "]");
         }
 
         this.DumpStage(stage, enemies);
 
-        var target = this.ResolveTrio(board, roster, enemies);
+        var target = this.ResolveTrio(board, roster, enemies, weaknesses);
         if (target.Count != 3)
         {
-            var fallback = rows.Where(r => r.MaxHp == 0 || r.Hp != 0).Select(r => r.Number).Distinct().Take(3).ToList();
-            if (fallback.Count == 3)
-            {
-                this.Warn($"no complete trio resolved ({target.Count} beasts) - using the first three roster beasts");
-                target = fallback;
-            }
-            else
-            {
-                this.Warn($"no trio for board {board} and no usable roster rows");
-                return;
-            }
+            this.Warn("no trio could be resolved for this encounter - waiting (no fallback trio)");
+            return;
         }
 
         var missing = target.Where(t => !roster.Contains(t)).ToList();
@@ -220,16 +213,16 @@ public sealed unsafe class HornAutopilot
     private string lastEnemySignature = string.Empty;
     private List<uint> cachedPick = new();
 
-    /// <summary>Resolve the trio for the encounter currently being set up (recomputed only when the enemy set changes).</summary>
-    private List<uint> ResolveTrio(int board, HashSet<uint> roster, IReadOnlyList<string> enemies)
+    /// <summary>Resolve the trio for the encounter currently being set up (recomputed only when the encounter changes).</summary>
+    private List<uint> ResolveTrio(int board, HashSet<uint> roster, IReadOnlyList<string> enemies, IReadOnlyCollection<string> weaknesses)
     {
-        var fixedTrio = this.plugin.Config.Trio(board);
         if (!this.plugin.Config.AutoPick)
         {
-            return fixedTrio;
+            var manual = this.plugin.Config.Trio(board);
+            return manual.Count == 3 ? manual : new List<uint>();
         }
 
-        string signature = string.Join("|", enemies.OrderBy(e => e, StringComparer.OrdinalIgnoreCase));
+        string signature = string.Join("|", enemies) + "##" + string.Join(",", weaknesses);
         if (signature == this.lastEnemySignature && this.cachedPick.Count == 3 && this.cachedPick.All(roster.Contains))
         {
             return this.cachedPick;
@@ -241,13 +234,7 @@ public sealed unsafe class HornAutopilot
             this.LastEnemies = enemies;
         }
 
-        if (enemies.Count == 0)
-        {
-            this.LastPickReason = "no enemies in range yet";
-            return fixedTrio;
-        }
-
-        // Curated per-encounter default first (community picks), live scoring only for unknown encounters.
+        // Curated per-encounter default first (community picks).
         if (this.plugin.Config.UseDefaults)
         {
             var curated = this.plugin.Intel.DefaultTrio(board, enemies, out string label);
@@ -260,17 +247,62 @@ public sealed unsafe class HornAutopilot
             }
         }
 
-        var picks = this.plugin.Intel.PickTrio(roster.ToList(), out string reason);
-        this.LastPickReason = reason;
-        this.plugin.CpLog.Info("encounter [" + string.Join(", ", enemies) + "] -> scored pick " + string.Join(",", picks) + " (" + reason + ")");
-        if (picks.Count != 3 || picks.Any(p => !roster.Contains(p)))
+        // Otherwise pick from the weaknesses the stage window shows.
+        if (weaknesses.Count > 0)
         {
-            this.log.Debug($"[CP] encounter picker fell back to the configured trio ({reason})");
-            return fixedTrio;
+            var picks = this.plugin.Intel.PickFromTags(roster.ToList(), weaknesses, out string reason);
+            if (picks.Count == 3)
+            {
+                this.LastPickReason = "weaknesses [" + string.Join(",", weaknesses) + "]: " + reason;
+                this.plugin.CpLog.Info("encounter [" + string.Join(", ", enemies) + "] -> weakness pick " + string.Join(",", picks) + " (" + reason + ")");
+                this.cachedPick = picks;
+                return picks;
+            }
         }
 
-        this.cachedPick = picks;
-        return picks;
+        this.LastPickReason = "unresolved";
+        return new List<uint>();
+    }
+
+    private static readonly HashSet<string> WeaknessWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "fire", "ice", "wind", "earth", "lightning", "water", "holy", "dark", "blunt", "piercing", "slashing",
+    };
+
+    /// <summary>Weakness tags shown in the stage window ("Weakness:" followed by e.g. "Blunt").</summary>
+    private static List<string> ExtractWeaknesses(IReadOnlyList<string> stageText)
+    {
+        var tags = new List<string>();
+        for (int i = 0; i + 1 < stageText.Count; i++)
+        {
+            if (!stageText[i].Trim().Equals("Weakness:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(stageText[i + 1], "[A-Za-z]+"))
+            {
+                string word = match.Value.ToLowerInvariant();
+                if (!WeaknessWords.Contains(word))
+                {
+                    continue;
+                }
+
+                string tag = word switch
+                {
+                    "slashing" => "slash",
+                    "piercing" => "pierce",
+                    _ => word,
+                };
+
+                if (!tags.Contains(tag))
+                {
+                    tags.Add(tag);
+                }
+            }
+        }
+
+        return tags;
     }
 
     /// <summary>Texts shown in the stage window (it lists the encounter's enemies before the battle starts).</summary>

@@ -11,11 +11,11 @@ public sealed class Ui
 {
     private static readonly string[] BoardNames =
     {
-        "1 - Novice I (First Board)",
-        "2 - Novice II (Second Board)",
-        "3 - Novice III (Third Board)",
-        "4 - Advanced I (First Master's)",
-        "5 - Advanced II (Second Master's)",
+        "1 - First Board",
+        "2 - Second Board",
+        "3 - Third Board",
+        "4 - First Master's Board",
+        "5 - Second Master's Board",
     };
 
     private static readonly string[] DegreeNames = { "Standard", "First", "Second", "Third" };
@@ -35,6 +35,7 @@ public sealed class Ui
 
     private readonly Plugin plugin;
     private string? rosterText;
+    private string? foodText;
     private int lastBoard = -1;
 
     public Ui(Plugin plugin) => this.plugin = plugin;
@@ -104,31 +105,24 @@ public sealed class Ui
         }
 
         ImGui.Separator();
-        ImGui.TextUnformatted("Fallback trio for this board (used when the picker has no enemies)");
+        ImGui.TextUnformatted("Food (the Crucible disables potions; the meal buff is all you can bring in)");
 
-        var trio = config.Trio(config.Board);
-        var selected = new uint[3];
-        for (int i = 0; i < 3; i++)
+        bool eatFood = config.EatFood;
+        if (ImGui.Checkbox("Eat food before the run", ref eatFood))
         {
-            selected[i] = i < trio.Count ? trio[i] : 0;
-        }
-
-        bool trioChanged = false;
-        for (int i = 0; i < 3; i++)
-        {
-            int slot = selected[i] == 0 ? 0 : (int)selected[i] - 1;
-            ImGui.SetNextItemWidth(300);
-            if (ImGui.Combo($"Horn {i + 1}", ref slot, BeastItems))
-            {
-                selected[i] = (uint)(slot + 1);
-                trioChanged = true;
-            }
-        }
-
-        if (trioChanged)
-        {
-            config.Trios[config.Board] = selected.Where(x => x > 0).Distinct().ToList();
+            config.EatFood = eatFood;
             this.plugin.SaveConfig();
+        }
+
+        this.foodText ??= config.FoodItemName;
+        ImGui.SetNextItemWidth(390);
+        if (ImGui.InputText("Food item", ref this.foodText, 128))
+        {
+            if (!string.IsNullOrWhiteSpace(this.foodText))
+            {
+                config.FoodItemName = this.foodText.Trim();
+                this.plugin.SaveConfig();
+            }
         }
 
         ImGui.Separator();
