@@ -142,6 +142,13 @@ public sealed class CrucibleCombat
 
         this.TickPotions(player);
 
+        // PromeRotation gates every action decision on the animation lock and the GCD windows:
+        // gcd <= 0.3s for GCD actions, gcd > 0.6s for oGCDs (prevents clipping), animation lock == 0.
+        float animationLock = actionManager->AnimationLock;
+        float gcdRemain = GcdRemain(actionManager);
+        bool canGcd = animationLock <= 0f && gcdRemain <= 0.3f;
+        bool canOffGcd = animationLock <= 0f && gcdRemain > 0.6f;
+
         var target = this.EnsureTarget();
 
         // Downtime axe: no enemy to hit, so spend the TP on Avalanche Axe when it is ready.
@@ -188,7 +195,7 @@ public sealed class CrucibleCombat
                 return;
             }
 
-            if (!this.HasFamiliar(player) && this.IsStandingStill(player) && DateTime.UtcNow - this.lastSummonAt > TimeSpan.FromSeconds(2))
+            if (!this.HasFamiliar(player) && animationLock <= 0f && this.IsStandingStill(player) && DateTime.UtcNow - this.lastSummonAt > TimeSpan.FromSeconds(2))
             {
                 uint horn = Horns[this.hornStage % Horns.Length];
                 if (actionManager->GetActionStatus(ActionType.Action, horn) == 0 &&
@@ -222,6 +229,30 @@ public sealed class CrucibleCombat
         }
 
         // oGCD priority: shield charge, borrow, beast mode, gauge-gated cheer/rally, burst, trick, parting blow.
+        if (!canOffGcd)
+        {
+            if (!canGcd)
+            {
+                return;
+            }
+
+            uint earlyGcd = this.PickGcd(actionManager);
+            if (earlyGcd != 0 &&
+                actionManager->UseAction(ActionType.Action, earlyGcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            {
+                this.comboAt = DateTime.UtcNow;
+                this.plugin.CpLog.Info($"combat: gcd {earlyGcd}");
+                this.comboStage = earlyGcd switch
+                {
+                    SmashAxe => 1,
+                    AxebladeBite => 2,
+                    _ => 0,
+                };
+            }
+
+            return;
+        }
+
         if (actionManager->GetActionStatus(ActionType.Action, ShieldCharge) == 0 &&
             actionManager->UseAction(ActionType.Action, ShieldCharge, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
         {
@@ -274,6 +305,11 @@ public sealed class CrucibleCombat
         }
 
         // GCD: combo chain first, TP spenders when they report ready.
+        if (!canGcd)
+        {
+            return;
+        }
+
         uint gcd = this.PickGcd(actionManager);
         if (gcd != 0 &&
             actionManager->UseAction(ActionType.Action, gcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
@@ -443,6 +479,20 @@ public sealed class CrucibleCombat
         catch (Exception)
         {
         }
+    }
+
+    private static unsafe float GcdRemain(ActionManager* actionManager)
+    {
+        // PromeRotation uses action 7411 as the universal GCD timer reference.
+        float total = actionManager->GetRecastTime(ActionType.Action, 7411u);
+        if (total <= 0f)
+        {
+            return 0f;
+        }
+
+        float elapsed = actionManager->GetRecastTimeElapsed(ActionType.Action, 7411u);
+        float remain = total - elapsed;
+        return remain > 0f ? remain : 0f;
     }
 
     private bool IsStandingStill(IPlayerCharacter player)
