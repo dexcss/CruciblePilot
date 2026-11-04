@@ -56,6 +56,14 @@ public sealed class Plugin : IDalamudPlugin
         this.autoDutyTeam = new AutoDutyTeam(log);
         this.intel = new EnemyIntel(objects, data, log);
         this.food = new FoodHelper(this, objects, data);
+
+        if (this.Config.Version < 2)
+        {
+            this.Config.BoardRosters = CrucibleData.DefaultRosters();
+            this.Config.Version = 2;
+            pluginInterface.SavePluginConfig(this.Config);
+            log.Information("[CP] migrated config to v2: per-board rosters reset to the curated defaults");
+        }
         this.horns = new HornAutopilot(this, log, gameGui, clientState);
         this.ui = new Ui(this);
 
