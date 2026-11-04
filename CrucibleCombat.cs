@@ -55,6 +55,9 @@ public sealed class CrucibleCombat
     private int hornStage;
     private DateTime summonPendingUntil = DateTime.MinValue;
     private DateTime lastSummonAt = DateTime.MinValue;
+    private int pendingHornSlot = -1;
+    private System.Numerics.Vector3 lastPosition;
+    private DateTime lastMovedAt = DateTime.MinValue;
     private DateTime nextDiagnostic = DateTime.MinValue;
     private DateTime lastPotionAt = DateTime.MinValue;
     private DateTime countdownStartedAt = DateTime.MinValue;
@@ -160,19 +163,42 @@ public sealed class CrucibleCombat
             return;
         }
 
-        // Battlehorns: only when no familiar is out, 3s pending for the cast, cycling slots.
-        if (this.plugin.Config.CombatHorns && !this.HasFamiliar(player) && DateTime.UtcNow >= this.summonPendingUntil &&
-            DateTime.UtcNow - this.lastSummonAt > TimeSpan.FromSeconds(8))
+        // Battlehorns. The summon is a 1s cast, so: only start it while standing still, do NOT advance the horn
+        // slot when the cast starts (a cancelled cast would otherwise consume the horn), advance only when the
+        // familiar actually appears, and retry the same horn if the cast was lost.
+        if (this.plugin.Config.CombatHorns)
         {
-            uint horn = Horns[this.hornStage % Horns.Length];
-            if (actionManager->GetActionStatus(ActionType.Action, horn) == 0 &&
-                actionManager->UseAction(ActionType.Action, horn, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            if (this.pendingHornSlot >= 0)
             {
-                this.plugin.CpLog.Info($"combat: summon horn {(this.hornStage % Horns.Length) + 1}");
-                this.hornStage = (this.hornStage + 1) % Horns.Length;
-                this.summonPendingUntil = DateTime.UtcNow.AddSeconds(3);
-                this.lastSummonAt = DateTime.UtcNow;
+                if (this.HasFamiliar(player))
+                {
+                    this.plugin.CpLog.Info($"combat: horn {this.pendingHornSlot + 1} summoned");
+                    this.hornStage = (this.pendingHornSlot + 1) % Horns.Length;
+                    this.pendingHornSlot = -1;
+                    this.lastSummonAt = DateTime.UtcNow;
+                    return;
+                }
+
+                if (DateTime.UtcNow >= this.summonPendingUntil)
+                {
+                    this.plugin.CpLog.Info($"combat: horn {this.pendingHornSlot + 1} cast lost (moving/interrupted), retrying same horn");
+                    this.pendingHornSlot = -1;
+                }
+
                 return;
+            }
+
+            if (!this.HasFamiliar(player) && this.IsStandingStill(player) && DateTime.UtcNow - this.lastSummonAt > TimeSpan.FromSeconds(2))
+            {
+                uint horn = Horns[this.hornStage % Horns.Length];
+                if (actionManager->GetActionStatus(ActionType.Action, horn) == 0 &&
+                    actionManager->UseAction(ActionType.Action, horn, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+                {
+                    this.plugin.CpLog.Info($"combat: casting horn {(this.hornStage % Horns.Length) + 1}");
+                    this.pendingHornSlot = this.hornStage % Horns.Length;
+                    this.summonPendingUntil = DateTime.UtcNow.AddSeconds(3);
+                    return;
+                }
             }
         }
 
@@ -287,6 +313,11 @@ public sealed class CrucibleCombat
         }
 
         double elapsed = (DateTime.UtcNow - this.countdownStartedAt).TotalSeconds;
+        var countdownPlayer = this.objects.LocalPlayer;
+        if (countdownPlayer == null || !this.IsStandingStill(countdownPlayer))
+        {
+            return;
+        }
 
         if (!this.countdownHorn3 && elapsed >= 1.0 &&
             this.Use(actionManager, ThirdHorn, 0xE0000000))
@@ -412,6 +443,18 @@ public sealed class CrucibleCombat
         catch (Exception)
         {
         }
+    }
+
+    private bool IsStandingStill(IPlayerCharacter player)
+    {
+        var position = player.Position;
+        if (System.Numerics.Vector3.Distance(position, this.lastPosition) > 0.05f)
+        {
+            this.lastPosition = position;
+            this.lastMovedAt = DateTime.UtcNow;
+        }
+
+        return DateTime.UtcNow - this.lastMovedAt > TimeSpan.FromSeconds(0.4);
     }
 
     private bool HasFamiliar(IPlayerCharacter player) => this.FindFamiliar(player) != null;
