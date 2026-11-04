@@ -82,7 +82,7 @@ public sealed class Plugin : IDalamudPlugin
         this.degree = new DegreeHelper(this, gameGui, clientState);
         this.whistle = new WhistleHelper(this, objects, targetManager, condition, clientState, gameGui);
         this.crucibleItems = new CrucibleItems(interop, gameGui, log);
-        this.crucibleCombat = new CrucibleCombat(this, objects, targetManager, condition, clientState, crucibleItems);
+        this.crucibleCombat = new CrucibleCombat(this, objects, targetManager, condition, clientState, gameGui, crucibleItems);
         this.ui = new Ui(this);
 
         this.commands.AddHandler(CommandName, new CommandInfo(this.OnCommand)

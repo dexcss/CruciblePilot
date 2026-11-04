@@ -6,33 +6,40 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace CruciblePilot;
 
 /// <summary>
-/// A Crucible-focused Beastmaster combat loop. Replaces the generic RSR rotation inside the arena with the
-/// action set the Crucible actually uses: battlehorns, the axe combo, TP spenders, familiar oGCDs, crucible
-/// potions and the per-horn Tempered Release finisher.
+/// Crucible Beastmaster combat, ported from the observed behaviour of the XSZYYS ACR: countdown opener,
+/// familiar-gated battlehorns, axe combo, TP spenders, the full familiar oGCD chain, gauge-driven instinct
+/// spenders, crucible potions and the per-horn Tempered Release finisher.
 /// </summary>
 public sealed class CrucibleCombat
 {
     private const uint SmashAxe = 44879;
+    private const uint Capture = 44880;
+    private const uint FirstHorn = 44881;
     private const uint AxebladeBite = 44883;
-    private const uint Shieldsplitter = 44885;
     private const uint AvalancheAxe = 44884;
+    private const uint Shieldsplitter = 44885;
+    private const uint BeastMode = 44886;
     private const uint MistralAxe = 44887;
     private const uint SpinningAxe = 44888;
     private const uint GaleAxe = 44889;
-    private const uint Trick = 47093;
+    private const uint TemperedRelease = 44890;
     private const uint PartingBlow = 44891;
-    private const uint BeastMode = 44886;
+    private const uint SecondHorn = 44892;
+    private const uint ShieldCharge = 44893;
+    private const uint ThirdHorn = 44894;
+    private const uint Borrow = 44895;
+    private const uint RangedFallback = 44900;
     private const uint RallyingCheer = 44904;
     private const uint Rally = 44905;
     private const uint Burst = 44930;
-    private const uint ShieldCharge = 44893;
-    private const uint TemperedRelease = 44890;
-    private const uint Borrow = 44895;
-    private static readonly uint[] Horns = { 44881, 44892, 44894 };
+    private const uint Trick = 47093;
+
+    private static readonly uint[] Horns = { FirstHorn, SecondHorn, ThirdHorn };
     private static readonly uint[] FightPotions = { 79, 78, 77, 76, 82, 81, 80 };
 
     private readonly Plugin plugin;
@@ -40,22 +47,26 @@ public sealed class CrucibleCombat
     private readonly ITargetManager targetManager;
     private readonly ICondition condition;
     private readonly IClientState clientState;
+    private readonly IGameGui gameGui;
     private readonly CrucibleItems items;
     private DateTime nextTick = DateTime.MinValue;
     private int comboStage;
-    private uint comboAction;
     private DateTime comboAt = DateTime.MinValue;
     private int hornStage;
     private DateTime summonPendingUntil = DateTime.MinValue;
-    private DateTime lastHornAt = DateTime.MinValue;
+    private DateTime countdownStartedAt = DateTime.MinValue;
+    private bool countdownHorn3;
+    private bool countdownBorrow;
+    private bool countdownHorn1;
 
-    public CrucibleCombat(Plugin plugin, IObjectTable objects, ITargetManager targetManager, ICondition condition, IClientState clientState, CrucibleItems items)
+    public CrucibleCombat(Plugin plugin, IObjectTable objects, ITargetManager targetManager, ICondition condition, IClientState clientState, IGameGui gameGui, CrucibleItems items)
     {
         this.plugin = plugin;
         this.objects = objects;
         this.targetManager = targetManager;
         this.condition = condition;
         this.clientState = clientState;
+        this.gameGui = gameGui;
         this.items = items;
     }
 
@@ -64,21 +75,7 @@ public sealed class CrucibleCombat
         uint territory = this.clientState.TerritoryType;
         if (territory is < 1339 or > 1343)
         {
-            this.comboStage = 0;
-            this.hornStage = 0;
-            this.lastHornAt = DateTime.MinValue;
-            return;
-        }
-
-        if (!this.condition[ConditionFlag.InCombat])
-        {
-            // New fight: start the horn order over once we have been out of combat for a moment.
-            if (this.hornStage > 0 && DateTime.UtcNow - this.lastHornAt > TimeSpan.FromSeconds(5))
-            {
-                this.hornStage = 0;
-                this.comboStage = 0;
-            }
-
+            this.ResetFightState();
             return;
         }
 
@@ -86,6 +83,25 @@ public sealed class CrucibleCombat
         {
             return;
         }
+
+        if (!this.condition[ConditionFlag.InCombat])
+        {
+            // Between fights: run the pre-pull countdown sequence and reset once out for a moment.
+            if (this.plugin.Config.CombatCountdownOpener)
+            {
+                this.TickCountdownOpener();
+            }
+
+            if (DateTime.UtcNow - this.summonPendingUntil > TimeSpan.FromSeconds(8))
+            {
+                this.comboStage = 0;
+            }
+
+            return;
+        }
+
+        this.countdownStartedAt = DateTime.MinValue;
+        this.countdownHorn3 = this.countdownBorrow = this.countdownHorn1 = false;
 
         var player = this.objects.LocalPlayer;
         if (player == null || player.CurrentHp == 0)
@@ -106,42 +122,69 @@ public sealed class CrucibleCombat
             return;
         }
 
-        this.TickPotions(player);
-
-        var target = this.EnsureTarget();
-        if (target == null)
-        {
-            return;
-        }
-
-        // Combo resets after 30 seconds without the finisher.
+        // Combo resets after 30 seconds.
         if (DateTime.UtcNow - this.comboAt > TimeSpan.FromSeconds(30))
         {
             this.comboStage = 0;
         }
 
-        // Battlehorns: XSZYYS only summons when no familiar is out (plus a 3s pending window for the 1s cast
-        // and latency), and cycles through the three horns.
-        if (this.plugin.Config.CombatHorns)
+        this.TickPotions(player);
+
+        var target = this.EnsureTarget();
+
+        // Downtime axe: no enemy to hit, so spend the TP on Avalanche Axe when it is ready.
+        if (target == null)
         {
-            bool familiarOut = this.HasFamiliar(player);
-            if (!familiarOut && DateTime.UtcNow >= this.summonPendingUntil)
+            if (this.plugin.Config.CombatDowntimeAxe &&
+                actionManager->GetActionStatus(ActionType.Action, AvalancheAxe) == 0 &&
+                actionManager->UseAction(ActionType.Action, AvalancheAxe, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
             {
-                uint horn = Horns[this.hornStage % Horns.Length];
-                if (actionManager->GetActionStatus(ActionType.Action, horn) == 0 &&
-                    actionManager->UseAction(ActionType.Action, horn, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
-                {
-                    this.plugin.CpLog.Info($"combat: summon horn {(this.hornStage % Horns.Length) + 1}");
-                    this.hornStage = (this.hornStage + 1) % Horns.Length;
-                    this.summonPendingUntil = DateTime.UtcNow.AddSeconds(3);
-                    return;
-                }
+                this.plugin.CpLog.Info("combat: downtime avalanche axe");
+            }
+
+            return;
+        }
+
+        // Pet-skill finisher: Parting Blow while the familiar is finishing its own ability.
+        if (this.plugin.Config.CombatPetFinisher && this.TryPetFinisher(actionManager, player))
+        {
+            return;
+        }
+
+        // Battlehorns: only when no familiar is out, 3s pending for the cast, cycling slots.
+        if (this.plugin.Config.CombatHorns && !this.HasFamiliar(player) && DateTime.UtcNow >= this.summonPendingUntil)
+        {
+            uint horn = Horns[this.hornStage % Horns.Length];
+            if (actionManager->GetActionStatus(ActionType.Action, horn) == 0 &&
+                actionManager->UseAction(ActionType.Action, horn, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+            {
+                this.plugin.CpLog.Info($"combat: summon horn {(this.hornStage % Horns.Length) + 1}");
+                this.hornStage = (this.hornStage + 1) % Horns.Length;
+                this.summonPendingUntil = DateTime.UtcNow.AddSeconds(3);
+                return;
             }
         }
 
-        // oGCDs first so they weave before the GCD lock.
-        // oGCD priority, mirroring the XSZYYS resolver order: shield charge, borrow/beast mode, rallying cheer,
-        // rally, trick, parting blow. Action status gates cooldowns and unmet requirements.
+        // Ranged fallback when the target is out of melee reach.
+        float distance = Distance(player.Position, target.Position);
+        if (this.plugin.Config.CombatRangedFallback && distance > 3.5f &&
+            actionManager->GetActionStatus(ActionType.Action, RangedFallback) == 0 &&
+            actionManager->UseAction(ActionType.Action, RangedFallback, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+        {
+            this.plugin.CpLog.Info($"combat: ranged fallback at {distance:F1}m");
+            return;
+        }
+
+        // Capture marks the target for the capture mechanic (off by default).
+        if (this.plugin.Config.CombatCapture &&
+            actionManager->GetActionStatus(ActionType.Action, Capture) == 0 &&
+            actionManager->UseAction(ActionType.Action, Capture, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+        {
+            this.plugin.CpLog.Info("combat: capture");
+            return;
+        }
+
+        // oGCD priority: shield charge, borrow, beast mode, gauge-gated cheer/rally, burst, trick, parting blow.
         if (actionManager->GetActionStatus(ActionType.Action, ShieldCharge) == 0 &&
             actionManager->UseAction(ActionType.Action, ShieldCharge, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
         {
@@ -164,14 +207,13 @@ public sealed class CrucibleCombat
             return;
         }
 
-        // Cheer/Rally spend instinct stacks, so only use them when the gauge says the stacks exist.
         if (BeastGauge.TryRead(out var gauge))
         {
             if (gauge.NaturalInstinct > 0 &&
                 actionManager->GetActionStatus(ActionType.Action, RallyingCheer) == 0 &&
                 actionManager->UseAction(ActionType.Action, RallyingCheer, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
             {
-                this.plugin.CpLog.Info($"combat: ogcd rallying cheer (natural {gauge.NaturalInstinct})");
+                this.plugin.CpLog.Info($"combat: ogcd cheer (natural {gauge.NaturalInstinct})");
                 return;
             }
 
@@ -194,26 +236,110 @@ public sealed class CrucibleCombat
             }
         }
 
-        // GCD: TP spender when available, otherwise the axe combo.
+        // GCD: combo chain first, TP spenders when they report ready.
         uint gcd = this.PickGcd(actionManager);
         if (gcd != 0 &&
             actionManager->UseAction(ActionType.Action, gcd, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
         {
             this.comboAt = DateTime.UtcNow;
-            this.comboAction = gcd;
             this.comboStage = gcd switch
             {
                 SmashAxe => 1,
                 AxebladeBite => 2,
+                Shieldsplitter => 0,
                 _ => 0,
             };
-            return;
         }
     }
 
+    private unsafe void TickCountdownOpener()
+    {
+        var addon = this.gameGui.GetAddonByName<AtkUnitBase>("Countdown");
+        if (addon == null || !addon->IsReady || !addon->IsVisible)
+        {
+            this.countdownStartedAt = DateTime.MinValue;
+            this.countdownHorn3 = this.countdownBorrow = this.countdownHorn1 = false;
+            return;
+        }
+
+        if (this.countdownStartedAt == DateTime.MinValue)
+        {
+            this.countdownStartedAt = DateTime.UtcNow;
+            return;
+        }
+
+        var actionManager = ActionManager.Instance();
+        if (actionManager == null)
+        {
+            return;
+        }
+
+        double elapsed = (DateTime.UtcNow - this.countdownStartedAt).TotalSeconds;
+
+        if (!this.countdownHorn3 && elapsed >= 1.0 &&
+            this.Use(actionManager, ThirdHorn, 0xE0000000))
+        {
+            this.countdownHorn3 = true;
+            this.plugin.CpLog.Info("opener: third horn during countdown");
+            return;
+        }
+
+        if (this.countdownHorn3 && !this.countdownBorrow && elapsed >= 2.5 &&
+            this.Use(actionManager, Borrow, 0xE0000000))
+        {
+            this.countdownBorrow = true;
+            this.plugin.CpLog.Info("opener: borrow during countdown");
+            return;
+        }
+
+        if (this.countdownBorrow && !this.countdownHorn1 && elapsed >= 3.0 &&
+            this.Use(actionManager, FirstHorn, 0xE0000000))
+        {
+            this.countdownHorn1 = true;
+            this.plugin.CpLog.Info("opener: first horn during countdown");
+        }
+    }
+
+    private unsafe bool TryPetFinisher(ActionManager* actionManager, IPlayerCharacter player)
+    {
+        var pet = this.FindFamiliar(player);
+        if (pet == null || pet.CastActionId is not (49428u or 49429u))
+        {
+            return false;
+        }
+
+        double remaining = pet.TotalCastTime - pet.CurrentCastTime;
+        if (remaining <= 0 || remaining > 2.0 || pet.Level % 5 != 0)
+        {
+            return false;
+        }
+
+        if (actionManager->GetActionStatus(ActionType.Action, PartingBlow) != 0)
+        {
+            return false;
+        }
+
+        var target = this.targetManager.Target;
+        if (target == null)
+        {
+            return false;
+        }
+
+        if (actionManager->UseAction(ActionType.Action, PartingBlow, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.None, 0, null))
+        {
+            this.plugin.CpLog.Info($"combat: pet finisher parting blow (pet cast {pet.CastActionId}, {remaining:F1}s left, lv{pet.Level})");
+            return true;
+        }
+
+        return false;
+    }
+
+    private unsafe bool Use(ActionManager* actionManager, uint action, ulong targetId)
+        => actionManager->GetActionStatus(ActionType.Action, action) == 0 &&
+           actionManager->UseAction(ActionType.Action, action, targetId, 0xFFFF, ActionManager.UseActionMode.None, 0, null);
+
     private unsafe uint PickGcd(ActionManager* actionManager)
     {
-        // Finish the combo chain first; it is the reliable damage.
         if (this.comboStage == 2 && actionManager->GetActionStatus(ActionType.Action, Shieldsplitter) == 0)
         {
             return Shieldsplitter;
@@ -224,7 +350,6 @@ public sealed class CrucibleCombat
             return AxebladeBite;
         }
 
-        // TP spenders on cooldown (they only report ready with enough TP).
         foreach (uint spender in new[] { AvalancheAxe, MistralAxe, SpinningAxe, GaleAxe })
         {
             if (actionManager->GetActionStatus(ActionType.Action, spender) == 0)
@@ -233,12 +358,7 @@ public sealed class CrucibleCombat
             }
         }
 
-        if (actionManager->GetActionStatus(ActionType.Action, SmashAxe) == 0)
-        {
-            return SmashAxe;
-        }
-
-        return 0;
+        return actionManager->GetActionStatus(ActionType.Action, SmashAxe) == 0 ? SmashAxe : 0;
     }
 
     private unsafe void TickPotions(IPlayerCharacter player)
@@ -266,17 +386,19 @@ public sealed class CrucibleCombat
         }
     }
 
-    private bool HasFamiliar(Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter player)
+    private bool HasFamiliar(IPlayerCharacter player) => this.FindFamiliar(player) != null;
+
+    private IBattleNpc? FindFamiliar(IPlayerCharacter player)
     {
         foreach (var obj in this.objects)
         {
             if (obj is IBattleNpc npc && npc.OwnerId == player.GameObjectId && npc.CurrentHp > 0)
             {
-                return true;
+                return npc;
             }
         }
 
-        return false;
+        return null;
     }
 
     private IBattleNpc? EnsureTarget()
@@ -285,12 +407,6 @@ public sealed class CrucibleCombat
         if (current != null && current.CurrentHp > 0 && current.IsTargetable)
         {
             return current;
-        }
-
-        var player = this.objects.LocalPlayer;
-        if (player == null)
-        {
-            return null;
         }
 
         IBattleNpc? best = null;
@@ -313,5 +429,17 @@ public sealed class CrucibleCombat
         }
 
         return best;
+    }
+
+    private static float Distance(System.Numerics.Vector3 a, System.Numerics.Vector3 b)
+        => (a - b).Length();
+
+    private void ResetFightState()
+    {
+        this.comboStage = 0;
+        this.hornStage = 0;
+        this.summonPendingUntil = DateTime.MinValue;
+        this.countdownStartedAt = DateTime.MinValue;
+        this.countdownHorn3 = this.countdownBorrow = this.countdownHorn1 = false;
     }
 }

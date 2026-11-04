@@ -34,6 +34,21 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Run our own Beastmaster Crucible rotation (replaces RSR inside the arena).</summary>
     public bool EnableCombat { get; set; } = true;
 
+    /// <summary>Run the XSZYYS pre-pull countdown opener (third horn, borrow, first horn).</summary>
+    public bool CombatCountdownOpener { get; set; } = true;
+
+    /// <summary>Parting Blow while the familiar is finishing its own ability (pet-skill finisher).</summary>
+    public bool CombatPetFinisher { get; set; } = true;
+
+    /// <summary>Use the ranged fallback action when the target is out of melee range.</summary>
+    public bool CombatRangedFallback { get; set; } = true;
+
+    /// <summary>Use Capture to mark targets (off by default, only for capture runs).</summary>
+    public bool CombatCapture { get; set; }
+
+    /// <summary>Spend TP on Avalanche Axe when there is no enemy in range.</summary>
+    public bool CombatDowntimeAxe { get; set; } = true;
+
     /// <summary>Seconds between battlehorn summons so the opener does not replace its own familiars instantly.</summary>
     public int CombatHornIntervalSeconds { get; set; } = 12;
 
