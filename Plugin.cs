@@ -52,7 +52,7 @@ public sealed class Plugin : IDalamudPlugin
         this.autoDuty = new AutoDutyIpc(pluginInterface, log);
         this.autoDutyTeam = new AutoDutyTeam(log);
         this.intel = new EnemyIntel(objects, data, log);
-        this.food = new FoodHelper(this, objects);
+        this.food = new FoodHelper(this, objects, data);
         this.horns = new HornAutopilot(this, log, gameGui, clientState);
         this.ui = new Ui(this);
 
