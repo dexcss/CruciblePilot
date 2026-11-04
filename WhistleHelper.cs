@@ -113,6 +113,14 @@ public sealed class WhistleHelper
             return;
         }
 
+        // Borrow is also a 30s cooldown that feeds kinship, so keep it rolling when the familiar is up.
+        if (actionManager->GetActionStatus(ActionType.Action, Borrow) == 0 &&
+            actionManager->UseAction(ActionType.Action, Borrow, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
+        {
+            this.plugin.CpLog.Info($"whistle: borrow on cooldown (horn slot {slot + 1})");
+            return;
+        }
+
         bool wantBorrow = slot == 2 && this.plugin.Config.WhistleAutoBorrow;
         if (wantBorrow)
         {
@@ -132,11 +140,19 @@ public sealed class WhistleHelper
 
         if (hpPercent > threshold)
         {
+            // The finisher is a 30s-cooldown pet nuke, not a one-shot: keep it rolling on cooldown while the
+            // familiar is empowered, and only use the threshold to decide when it is worth holding.
+            if (actionManager->GetActionStatus(ActionType.Action, TemperedRelease) == 0 &&
+                actionManager->UseAction(ActionType.Action, TemperedRelease, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
+            {
+                this.plugin.CpLog.Info($"whistle: tempered release on cooldown at target {hpPercent:F0}%");
+            }
+
             return;
         }
 
         if (actionManager->GetActionStatus(ActionType.Action, TemperedRelease) == 0 &&
-            actionManager->UseAction(ActionType.Action, TemperedRelease, 0xE0000000, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
+            actionManager->UseAction(ActionType.Action, TemperedRelease, target.GameObjectId, 0xFFFF, ActionManager.UseActionMode.Queue, 0, null))
         {
             this.plugin.CpLog.Info($"whistle: horn {(slot < 0 ? 0 : slot + 1)} tempered release at target {hpPercent:F0}% (threshold {threshold}%)");
         }
